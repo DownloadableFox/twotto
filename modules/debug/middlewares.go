@@ -18,7 +18,7 @@ func MidwarePerformance[T any](tag *core.Identifier) core.MiddlewareFunc[T] {
 		return func(c context.Context, s *discordgo.Session, e *T) error {
 			start := time.Now()
 			err := next(c, s, e)
-			log.Info().Msgf("[PerformanceMidware] Finished event execution for \"%s\", took: %s", tag, time.Since(start))
+			log.Debug().Msgf("[PerformanceMidware] Finished event execution for \"%s\", took: %s", tag, time.Since(start))
 
 			return err
 		}
@@ -81,7 +81,12 @@ func panicWrap(s *discordgo.Session, e *discordgo.InteractionCreate) {
 		return
 	}
 
+	// Get stacktrace
+	stacktrace := make([]byte, 4096)
+	count := runtime.Stack(stacktrace, false)
+
 	log.Error().Any("panic", rec).Msg("[ErrorWrapMidware] Recovered from panic!")
+	log.Debug().Msg(string(stacktrace[:count]))
 
 	// Generate ID
 	id := xid.New()
@@ -114,10 +119,6 @@ func panicWrap(s *discordgo.Session, e *discordgo.InteractionCreate) {
 			return
 		}
 	}
-
-	// Get stacktrace
-	stacktrace := make([]byte, 4096)
-	count := runtime.Stack(stacktrace, false)
 
 	// Create reader
 	reader := bytes.NewReader(stacktrace[:count])

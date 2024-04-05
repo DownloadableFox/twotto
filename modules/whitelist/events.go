@@ -35,6 +35,8 @@ func CreateKickInfoEmbed(session *discordgo.Session, userId string, guildId stri
 }
 
 func HandleOnJoinEvent(ctx context.Context, s *discordgo.Session, e *discordgo.GuildMemberAdd) error {
+	log.Info().Msgf("[WhitelistModule] User %s (%s) joined guild %s", e.User, e.User.ID, e.GuildID)
+
 	wm, ok := ctx.Value(WhitelistManagerKey).(WhitelistManager)
 	if !ok {
 		return ErrWhitelistManagerNotFound

@@ -153,7 +153,7 @@ func HandleWhitelistCommandAdd(ctx context.Context, s *discordgo.Session, e *dis
 	}
 
 	// Get the user to add
-	userId := e.ApplicationCommandData().Options[0].StringValue()
+	userId := e.ApplicationCommandData().Options[0].Options[0].StringValue()
 
 	// Add the user to the whitelist
 	if err := ws.Whitelist(ctx, e.GuildID, userId); err != nil {
@@ -184,7 +184,7 @@ func HandleWhitelistCommandRemove(ctx context.Context, s *discordgo.Session, e *
 	}
 
 	// Get the user to remove
-	userId := e.ApplicationCommandData().Options[0].StringValue()
+	userId := e.ApplicationCommandData().Options[0].Options[0].StringValue()
 
 	// Remove the user from the whitelist
 	if err := ws.Unwhitelist(ctx, e.GuildID, userId); err != nil {
@@ -478,7 +478,7 @@ func HandleWhitelistCommandConfigSetRemoveOnBan(ctx context.Context, s *discordg
 	}
 
 	// Get the enabled value
-	enabled := e.ApplicationCommandData().Options[0].BoolValue()
+	enabled := e.ApplicationCommandData().Options[0].Options[0].Options[0].BoolValue()
 
 	// Set the remove on ban
 	if err := ws.SetRemoveOnBan(ctx, e.GuildID, enabled); err != nil {

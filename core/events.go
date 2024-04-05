@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/rs/zerolog/log"
@@ -13,7 +14,12 @@ func HandleEvent[T any](fn EventFunc[T]) interface{} {
 	return func(s *discordgo.Session, e *T) {
 		defer func() {
 			if rec := recover(); rec != nil {
+				// Get stacktrace
+				stacktrace := make([]byte, 4096)
+				count := runtime.Stack(stacktrace, false)
+
 				log.Error().Any("panic", rec).Msg("[EventHandler] Recovered from fatal error while executing event!")
+				log.Debug().Msg("[EventHandler] Stack trace: \n" + string(stacktrace[:count]))
 			}
 		}()
 
