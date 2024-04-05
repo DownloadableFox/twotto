@@ -1,33 +1,51 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/downloadablefox/twotto/modules/debug"
-	"github.com/downloadablefox/twotto/modules/extra"
-	"github.com/downloadablefox/twotto/modules/whitelist"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+var (
+	ConfigFile string
+	BotConfig  *Config
+)
 
-	client, err := discordgo.New("Bot + TOKEN")
+func init() {
+	// Parse flags
+	flag.StringVar(&ConfigFile, "config", "config.json", "Path to the config file")
+	flag.Parse()
+
+	// Load config
+	var err error
+	if BotConfig, err = LoadConfig(ConfigFile); err != nil {
+		log.Fatal().Err(err).Msg("Failed to load config file!")
+	}
+
+	// Set log level
+	if BotConfig.Debug {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+}
+
+func main() {
+	client, err := discordgo.New("Bot " + BotConfig.Token)
 	if err != nil {
 		panic(err)
 	}
 
-	// Set intents
-	client.Identify.Intents = discordgo.IntentGuildMessages
-
-	// Register modules
-	debug.RegisterModule(client)
-	extra.RegisterModule(client)
-	whitelist.RegisterModule(client)
+	// Bootstrap
+	if err := bootstrap(client, BotConfig); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bootstrap bot!")
+	}
 
 	// Run til end
 	if err := client.Open(); err != nil {

@@ -31,7 +31,7 @@ func HandleOnReadyEvent(_ context.Context, s *discordgo.Session, e *discordgo.Re
 	log.Info().Msgf("[DebugModule] Logged in as %s#%s", e.User.Username, e.User.Discriminator)
 
 	// Liste guilds
-	guilds, err := s.UserGuilds(0, "", "")
+	guilds, err := s.UserGuilds(0, "", "", false)
 	if err != nil {
 		log.Warn().Err(err).Msg("[DebugModule] Failed to list guilds")
 	} else {

@@ -45,7 +45,7 @@ func HandleOnJoinEvent(ctx context.Context, s *discordgo.Session, e *discordgo.G
 		return nil
 	}
 
-	if !wm.IsWhitelisted(e.GuildID, e.User.ID) {
+	if !wm.IsWhitelisted(ctx, e.GuildID, e.User.ID) {
 		log.Warn().Msgf("[WhitelistModule] User %s (%s) joined guild %s but is not whitelisted! Kicking...", e.User, e.User.ID, e.GuildID)
 
 		// Attempt to DM the user
@@ -66,7 +66,7 @@ func HandleOnJoinEvent(ctx context.Context, s *discordgo.Session, e *discordgo.G
 		return nil
 	}
 
-	if role := wm.GetDefaultRole(e.GuildID); role != "" {
+	if role := wm.GetDefaultRole(ctx, e.GuildID); role != "" {
 		if err := s.GuildMemberRoleAdd(e.GuildID, e.User.ID, role); err != nil {
 			return err
 		}
@@ -86,10 +86,10 @@ func HandleOnBanEvent(ctx context.Context, s *discordgo.Session, e *discordgo.Gu
 		return nil
 	}
 
-	if wm.IsWhitelisted(e.GuildID, e.User.ID) {
+	if wm.IsWhitelisted(ctx, e.GuildID, e.User.ID) {
 		log.Warn().Msgf("[WhitelistModule] User %s (%s) was banned from guild %s, removing user from the whitelist...", e.User, e.User.ID, e.GuildID)
 
-		if err := wm.Unwhitelist(e.GuildID, e.User.ID); err != nil {
+		if err := wm.Unwhitelist(ctx, e.GuildID, e.User.ID); err != nil {
 			return err
 		}
 	}
@@ -105,9 +105,12 @@ func HandleOnReadyEvent(ctx context.Context, s *discordgo.Session, e *discordgo.
 	}
 
 	// Register
-	core.ApplyCommands(
+	if err := core.ApplyCommands(
 		WhitelistCommand,
-	).For(s, "")
+	).For(s, ""); err != nil {
+		log.Warn().Msg("[WhitelistModule] Failed to register commands")
+		return err
+	}
 
 	return nil
 }
