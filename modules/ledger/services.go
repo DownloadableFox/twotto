@@ -384,7 +384,7 @@ func (m *RepoLedgerManager) LogMessageCreate(ctx context.Context, message *disco
 }
 
 func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *discordgo.Message) error {
-	if message.Author.Bot || message.GuildID == "" {
+	if message.GuildID == "" {
 		return nil
 	}
 
@@ -401,12 +401,36 @@ func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *disco
 	// Save in database
 	if err = m.repo.UpdateMessage(ctx, &LedgerMessage{
 		MessageId: message.ID,
-		GuildId:   message.GuildID,
-		ChannelId: message.ChannelID,
-		UserId:    message.Author.ID,
 		IsDeleted: true,
 	}); err != nil {
 		return err
+	}
+
+	messageData, err := m.repo.GetMessage(ctx, message.ID)
+	if err != nil {
+		return err
+	}
+
+	// Check if the message has a user, channel, and guild
+	if messageData.UserId == "" || messageData.ChannelId == "" || messageData.GuildId == "" {
+		return nil
+	}
+
+	// Get author
+	author, err := m.session.User(messageData.UserId)
+	if err != nil {
+		return err
+	}
+
+	// Log contents
+	content, err := m.repo.GetMessageContents(ctx, message.ID)
+	if err != nil {
+		return err
+	}
+
+	messageContent := "`no content saved in database`"
+	if len(content) > 0 {
+		messageContent = content[len(content)-1].Content
 	}
 
 	// Get log channel
@@ -427,30 +451,30 @@ func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *disco
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Content",
-				Value: message.Content,
+				Value: messageContent,
 			},
 			{
 				Name:  "URL",
-				Value: fmt.Sprintf("https://discord.com/channels/%s/%s/%s", message.GuildID, message.ChannelID, message.ID),
+				Value: fmt.Sprintf("https://discord.com/channels/%s/%s/%s", messageData.GuildId, messageData.ChannelId, messageData.UserId),
 			},
 			{
 				Name:   "Author Mention",
-				Value:  message.Author.Mention(),
+				Value:  author.Mention(),
 				Inline: true,
 			},
 			{
 				Name:   "Author ID/Tag",
-				Value:  fmt.Sprintf("`%s` /\n `%s`", message.Author.ID, message.Author.String()),
+				Value:  fmt.Sprintf("`%s` /\n `%s`", author.ID, author.String()),
 				Inline: true,
 			},
 			{
 				Name:   "Channel",
-				Value:  "<#" + message.ChannelID + ">",
+				Value:  "<#" + messageData.ChannelId + ">",
 				Inline: true,
 			},
 		},
 		Footer: &discordgo.MessageEmbedFooter{
-			Text: fmt.Sprintf("%s • %s", message.ID, message.Timestamp.Format("01/02/2006, 3:04:05 PM")),
+			Text: fmt.Sprintf("%s • %s", message.ID, messageData.CreatedAt.Format("01/02/2006, 3:04:05 PM")),
 		},
 	}
 
