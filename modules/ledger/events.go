@@ -26,7 +26,7 @@ func HandleOnMessageEditEvent(ctx context.Context, s *discordgo.Session, e *disc
 	}
 
 	// Log message
-	return lm.LogMessageEdit(ctx, e.BeforeUpdate, e)
+	return lm.LogMessageEdit(ctx, e)
 }
 
 func HandleOnMessageDeleteEvent(ctx context.Context, s *discordgo.Session, e *discordgo.MessageDelete) error {

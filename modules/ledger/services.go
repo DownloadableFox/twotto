@@ -6,6 +6,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/core"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
@@ -15,6 +16,263 @@ var (
 	ErrLedgerManagerNotFound = errors.New("ledger manager not found in context (missing injection)")
 )
 
+type LedgerRepository interface {
+	GetLedgerSettings(ctx context.Context, guildId string) (*LedgerSettings, error)
+	GetAllLedgerSettings(ctx context.Context, limit int, page int) ([]*LedgerSettings, error)
+	CreateLedgerSettings(ctx context.Context, settings *LedgerSettings) error
+	UpdateLedgerSettings(ctx context.Context, settings *LedgerSettings) error
+	DeleteLedgerSettings(ctx context.Context, guildId string) error
+	GetMessage(ctx context.Context, messageId string) (*LedgerMessage, error)
+	GetMessages(ctx context.Context, guildId string, limit int, page int) ([]*LedgerMessage, error)
+	CreateMessage(ctx context.Context, message *LedgerMessage) error
+	UpdateMessage(ctx context.Context, message *LedgerMessage) error
+	DeleteMessage(ctx context.Context, messageId string) error
+	GetMessageContent(ctx context.Context, contentId int) (*LedgerContent, error)
+	GetMessageContents(ctx context.Context, messageId string) ([]*LedgerContent, error)
+	CreateMessageContent(ctx context.Context, content *LedgerContent) error
+	UpdateMessageContent(ctx context.Context, content *LedgerContent) error
+	DeleteMessageContent(ctx context.Context, contentId int) error
+}
+
+type LedgerPostgresRepository struct {
+	pool *pgxpool.Pool
+}
+
+func NewLedgerPostgresRepository(pool *pgxpool.Pool) LedgerRepository {
+	return &LedgerPostgresRepository{pool: pool}
+}
+
+func (r *LedgerPostgresRepository) GetLedgerSettings(ctx context.Context, guildId string) (*LedgerSettings, error) {
+	var settings LedgerSettings
+	err := r.pool.QueryRow(ctx, `
+		SELECT guild_id, enabled, log_channel_id, created_at, updated_at
+		FROM ledger_settings
+		WHERE guild_id = $1	
+	`, guildId).Scan(&settings.GuildId, &settings.Enabled, &settings.LogChannelId, &settings.CreatedAt, &settings.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			ledgerSettings := &LedgerSettings{GuildId: guildId, Enabled: false, LogChannelId: ""}
+			err := r.CreateLedgerSettings(ctx, ledgerSettings)
+			if err != nil {
+				return nil, err
+			}
+
+			return ledgerSettings, nil
+		}
+
+		return nil, err
+	}
+
+	return &settings, nil
+}
+
+func (r *LedgerPostgresRepository) GetAllLedgerSettings(ctx context.Context, limit int, page int) ([]*LedgerSettings, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT guild_id, enabled, log_channel_id, created_at, updated_at
+		FROM ledger_settings
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, page*limit)
+	if err != nil {
+		return nil, err
+	}
+
+	var settings []*LedgerSettings
+	for rows.Next() {
+		var setting LedgerSettings
+		if err := rows.Scan(&setting.GuildId, &setting.Enabled, &setting.LogChannelId, &setting.CreatedAt, &setting.UpdatedAt); err != nil {
+			return nil, err
+		}
+		settings = append(settings, &setting)
+	}
+
+	return settings, nil
+}
+
+func (r *LedgerPostgresRepository) CreateLedgerSettings(ctx context.Context, settings *LedgerSettings) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO ledger_settings (guild_id, enabled, log_channel_id)
+		VALUES ($1, $2, $3)
+	`, settings.GuildId, settings.Enabled, settings.LogChannelId)
+	return err
+}
+
+func (r *LedgerPostgresRepository) UpdateLedgerSettings(ctx context.Context, settings *LedgerSettings) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE ledger_settings
+		SET enabled = $1, log_channel_id = $2
+		WHERE guild_id = $3
+	`, settings.Enabled, settings.LogChannelId, settings.GuildId)
+	return err
+}
+
+func (r *LedgerPostgresRepository) DeleteLedgerSettings(ctx context.Context, guildId string) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM ledger_settings
+		WHERE guild_id = $1
+	`, guildId)
+	return err
+}
+
+func (r *LedgerPostgresRepository) GetMessage(ctx context.Context, messageId string) (*LedgerMessage, error) {
+	var message LedgerMessage
+	err := r.pool.QueryRow(ctx, `
+		SELECT message_id, guild_id, channel_id, user_id, is_deleted, is_edited, created_at
+		FROM ledger_messages
+		WHERE message_id = $1
+	`, messageId).Scan(&message.MessageId, &message.GuildId, &message.ChannelId, &message.UserId, &message.IsDeleted, &message.IsEdited, &message.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &message, nil
+}
+
+func (r *LedgerPostgresRepository) GetMessages(ctx context.Context, guildId string, limit int, page int) ([]*LedgerMessage, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT message_id, guild_id, channel_id, user_id, is_deleted, is_edited, created_at
+		FROM ledger_messages
+		WHERE guild_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`, guildId, limit, page*limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*LedgerMessage
+	for rows.Next() {
+		var message LedgerMessage
+		if err := rows.Scan(&message.MessageId, &message.GuildId, &message.ChannelId, &message.UserId, &message.IsDeleted, &message.IsEdited, &message.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, &message)
+	}
+
+	return messages, nil
+}
+
+func (r *LedgerPostgresRepository) CreateMessage(ctx context.Context, message *LedgerMessage) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO ledger_messages (message_id, guild_id, channel_id, user_id)
+		VALUES ($1, $2, $3, $4)
+	`, message.MessageId, message.GuildId, message.ChannelId, message.UserId)
+	return err
+}
+
+func (r *LedgerPostgresRepository) UpdateMessage(ctx context.Context, message *LedgerMessage) error {
+	// if message doesn't exist create before updating
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM ledger_messages
+			WHERE message_id = $1
+		)
+	`, message.MessageId).Scan(&exists)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return r.CreateMessage(ctx, message)
+	}
+
+	_, err = r.pool.Exec(ctx, `
+		UPDATE ledger_messages
+		SET is_deleted = $1, is_edited = $2
+		WHERE message_id = $3
+	`, message.IsDeleted, message.IsEdited, message.MessageId)
+	return err
+}
+
+func (r *LedgerPostgresRepository) DeleteMessage(ctx context.Context, messageId string) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM ledger_messages
+		WHERE message_id = $1
+	`, messageId)
+	return err
+}
+
+func (r *LedgerPostgresRepository) GetMessageContent(ctx context.Context, contentId int) (*LedgerContent, error) {
+	var content LedgerContent
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, message_id, content, created_at
+		FROM ledger_contents
+		WHERE id = $1
+	`, contentId).Scan(&content.Id, &content.MessageId, &content.Content, &content.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &content, nil
+}
+
+func (r *LedgerPostgresRepository) GetMessageContents(ctx context.Context, messageId string) ([]*LedgerContent, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, message_id, content, created_at
+		FROM ledger_contents
+		WHERE message_id = $1
+	`, messageId)
+	if err != nil {
+		return nil, err
+	}
+
+	var contents []*LedgerContent
+	for rows.Next() {
+		var content LedgerContent
+		if err := rows.Scan(&content.Id, &content.MessageId, &content.Content, &content.CreatedAt); err != nil {
+			return nil, err
+		}
+		contents = append(contents, &content)
+	}
+
+	return contents, nil
+}
+
+func (r *LedgerPostgresRepository) CreateMessageContent(ctx context.Context, content *LedgerContent) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO ledger_contents (message_id, content)
+		VALUES ($1, $2)
+	`, content.MessageId, content.Content)
+	return err
+}
+
+func (r *LedgerPostgresRepository) UpdateMessageContent(ctx context.Context, content *LedgerContent) error {
+	// if content doesn't exist create before updating
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM ledger_contents
+			WHERE id = $1
+		)
+	`, content.Id).Scan(&exists)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return r.CreateMessageContent(ctx, content)
+	}
+
+	_, err = r.pool.Exec(ctx, `
+		UPDATE ledger_contents
+		SET content = $1
+		WHERE id = $2
+	`, content.Content, content.Id)
+	return err
+}
+
+func (r *LedgerPostgresRepository) DeleteMessageContent(ctx context.Context, contentId int) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM ledger_contents
+		WHERE id = $1
+	`, contentId)
+	return err
+}
+
 type LedgerManager interface {
 	GetShouldLog(ctx context.Context, guildId string) (bool, error)
 	SetShouldLog(ctx context.Context, guildId string, shouldLog bool) error
@@ -22,68 +280,61 @@ type LedgerManager interface {
 	SetLogChannel(ctx context.Context, guildId string, channelId string) error
 	LogMessageCreate(ctx context.Context, message *discordgo.Message) error
 	LogMessageDelete(ctx context.Context, message *discordgo.Message) error
-	LogMessageEdit(ctx context.Context, old *discordgo.Message, new *discordgo.MessageUpdate) error
+	LogMessageEdit(ctx context.Context, message *discordgo.MessageUpdate) error
 	LogCustomEvent(ctx context.Context, guildId string, data *discordgo.MessageSend) error
 }
 
-type PostgresLedgerManager struct {
+type RepoLedgerManager struct {
+	repo    LedgerRepository
 	session *discordgo.Session
-	pool    *pgxpool.Pool
 }
 
-func NewPostgresLedgerManager(session *discordgo.Session, pool *pgxpool.Pool) LedgerManager {
-	return &PostgresLedgerManager{pool: pool, session: session}
+func NewRepoLedgerManager(repo LedgerRepository, session *discordgo.Session) LedgerManager {
+	return &RepoLedgerManager{
+		repo:    repo,
+		session: session,
+	}
 }
 
-func (m *PostgresLedgerManager) GetShouldLog(ctx context.Context, guildId string) (bool, error) {
-	var shouldLog bool
-	err := m.pool.QueryRow(ctx, `
-		SELECT enabled
-		FROM ledger_settings
-		WHERE guild_id = $1
-	`, guildId).Scan(&shouldLog)
+func (m *RepoLedgerManager) GetShouldLog(ctx context.Context, guildId string) (bool, error) {
+	settings, err := m.repo.GetLedgerSettings(ctx, guildId)
 	if err != nil {
 		return false, err
 	}
 
-	return shouldLog, nil
+	return settings.Enabled, nil
 }
 
-func (m *PostgresLedgerManager) SetShouldLog(ctx context.Context, guildId string, shouldLog bool) error {
-	_, err := m.pool.Exec(ctx, `
-		INSERT INTO ledger_settings (guild_id, enabled)
-		VALUES ($1, $2)
-		ON CONFLICT (guild_id) DO UPDATE
-		SET enabled = $2
-	`, guildId, shouldLog)
-	return err
+func (m *RepoLedgerManager) SetShouldLog(ctx context.Context, guildId string, shouldLog bool) error {
+	settings, err := m.repo.GetLedgerSettings(ctx, guildId)
+	if err != nil {
+		return err
+	}
+
+	settings.Enabled = shouldLog
+	return m.repo.UpdateLedgerSettings(ctx, settings)
 }
 
-func (m *PostgresLedgerManager) GetLogChannel(ctx context.Context, guildId string) (string, error) {
-	var channelId string
-	err := m.pool.QueryRow(ctx, `
-		SELECT log_channel_id
-		FROM ledger_settings
-		WHERE guild_id = $1
-	`, guildId).Scan(&channelId)
+func (m *RepoLedgerManager) GetLogChannel(ctx context.Context, guildId string) (string, error) {
+	settings, err := m.repo.GetLedgerSettings(ctx, guildId)
 	if err != nil {
 		return "", err
 	}
 
-	return channelId, nil
+	return settings.LogChannelId, nil
 }
 
-func (m *PostgresLedgerManager) SetLogChannel(ctx context.Context, guildId string, channelId string) error {
-	_, err := m.pool.Exec(ctx, `
-		INSERT INTO ledger_settings (guild_id, log_channel_id)
-		VALUES ($1, $2)
-		ON CONFLICT (guild_id) DO UPDATE
-		SET log_channel_id = $2
-	`, guildId, channelId)
-	return err
+func (m *RepoLedgerManager) SetLogChannel(ctx context.Context, guildId string, channelId string) error {
+	settings, err := m.repo.GetLedgerSettings(ctx, guildId)
+	if err != nil {
+		return err
+	}
+
+	settings.LogChannelId = channelId
+	return m.repo.UpdateLedgerSettings(ctx, settings)
 }
 
-func (m *PostgresLedgerManager) LogCustomEvent(ctx context.Context, guildId string, data *discordgo.MessageSend) error {
+func (m *RepoLedgerManager) LogCustomEvent(ctx context.Context, guildId string, data *discordgo.MessageSend) error {
 	// Get log channel
 	channelId, err := m.GetLogChannel(ctx, guildId)
 	if err != nil {
@@ -94,12 +345,7 @@ func (m *PostgresLedgerManager) LogCustomEvent(ctx context.Context, guildId stri
 	return err
 }
 
-func (m *PostgresLedgerManager) LogMessageCreate(ctx context.Context, message *discordgo.Message) error {
-	// Logging creates isn't necessary
-	return nil
-}
-
-func (m *PostgresLedgerManager) LogMessageDelete(ctx context.Context, message *discordgo.Message) error {
+func (m *RepoLedgerManager) LogMessageCreate(ctx context.Context, message *discordgo.Message) error {
 	if message.Author.Bot || message.GuildID == "" {
 		return nil
 	}
@@ -112,6 +358,54 @@ func (m *PostgresLedgerManager) LogMessageDelete(ctx context.Context, message *d
 
 	if !shouldLog {
 		return nil
+	}
+
+	// Save in database
+	if err = m.repo.CreateMessage(ctx, &LedgerMessage{
+		MessageId: message.ID,
+		GuildId:   message.GuildID,
+		ChannelId: message.ChannelID,
+		UserId:    message.Author.ID,
+	}); err != nil {
+		return err
+	}
+
+	// Log contents
+	if err = m.repo.CreateMessageContent(ctx, &LedgerContent{
+		MessageId: message.ID,
+		Content:   message.Content,
+	}); err != nil {
+		return err
+	}
+
+	// Logging creates isn't necessary
+	return nil
+}
+
+func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *discordgo.Message) error {
+	if message.Author.Bot || message.GuildID == "" {
+		return nil
+	}
+
+	// Check if the guild has logging enabled
+	shouldLog, err := m.GetShouldLog(ctx, message.GuildID)
+	if err != nil {
+		return err
+	}
+
+	if !shouldLog {
+		return nil
+	}
+
+	// Save in database
+	if err = m.repo.UpdateMessage(ctx, &LedgerMessage{
+		MessageId: message.ID,
+		GuildId:   message.GuildID,
+		ChannelId: message.ChannelID,
+		UserId:    message.Author.ID,
+		IsDeleted: true,
+	}); err != nil {
+		return err
 	}
 
 	// Get log channel
@@ -156,13 +450,13 @@ func (m *PostgresLedgerManager) LogMessageDelete(ctx context.Context, message *d
 	return err
 }
 
-func (m *PostgresLedgerManager) LogMessageEdit(ctx context.Context, old *discordgo.Message, new *discordgo.MessageUpdate) error {
-	if new.Author.Bot || new.GuildID == "" {
+func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discordgo.MessageUpdate) error {
+	if message.Author.Bot || message.GuildID == "" {
 		return nil
 	}
 
 	// Check if the guild has logging enabled
-	shouldLog, err := m.GetShouldLog(ctx, new.GuildID)
+	shouldLog, err := m.GetShouldLog(ctx, message.GuildID)
 	if err != nil {
 		return err
 	}
@@ -171,14 +465,44 @@ func (m *PostgresLedgerManager) LogMessageEdit(ctx context.Context, old *discord
 		return nil
 	}
 
+	// get old message content
+	contents, err := m.repo.GetMessageContents(ctx, message.Message.ID)
+	if err != nil {
+		return err
+	}
+
+	previous := "`no content saved in database`"
+	if len(contents) > 0 {
+		previous = contents[0].Content
+	}
+
+	// Save in database
+	if err = m.repo.UpdateMessage(ctx, &LedgerMessage{
+		MessageId: message.Message.ID,
+		GuildId:   message.GuildID,
+		ChannelId: message.Message.ChannelID,
+		UserId:    message.Message.Author.ID,
+		IsEdited:  true,
+	}); err != nil {
+		return err
+	}
+
+	// Log contents
+	if err = m.repo.CreateMessageContent(ctx, &LedgerContent{
+		MessageId: message.Message.ID,
+		Content:   message.Message.Content,
+	}); err != nil {
+		return err
+	}
+
 	// Get log channel
-	channelId, err := m.GetLogChannel(ctx, new.GuildID)
+	channelId, err := m.GetLogChannel(ctx, message.GuildID)
 	if err != nil {
 		return err
 	}
 
 	if channelId == "" {
-		log.Debug().Msgf("[LedgerModule] Guild %s has logging enabled but no log channel set", new.GuildID)
+		log.Debug().Msgf("[LedgerModule] Guild %s has logging enabled but no log channel set", message.GuildID)
 		return nil
 	}
 
@@ -189,130 +513,30 @@ func (m *PostgresLedgerManager) LogMessageEdit(ctx context.Context, old *discord
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Old Content",
-				Value: old.Content,
+				Value: previous,
 			},
 			{
 				Name:  "New Content",
-				Value: new.Content,
+				Value: message.Content,
 			},
 			{
 				Name:   "Author",
-				Value:  new.Author.Mention(),
+				Value:  message.Author.Mention(),
 				Inline: true,
 			},
 			{
 				Name:   "Channel",
-				Value:  "<#" + new.ChannelID + ">",
+				Value:  "<#" + message.ChannelID + ">",
 				Inline: true,
 			},
 		},
 		Author: &discordgo.MessageEmbedAuthor{
-			Name:    new.Author.Username + "#" + new.Author.Discriminator,
-			IconURL: new.Author.AvatarURL(""),
+			Name:    message.Author.Username + "#" + message.Author.Discriminator,
+			IconURL: message.Author.AvatarURL(""),
 		},
-		Timestamp: new.Timestamp.String(),
+		Timestamp: message.Timestamp.String(),
 	}
 
 	_, err = m.session.ChannelMessageSendEmbed(channelId, embed)
 	return err
 }
-
-/*
-func (m *PostgresLedgerManager) LogMessageCreate(ctx context.Context, guildId string, channelId string, messageId string, userId string, content string) error {
-	_, err := m.pool.Exec(ctx, `
-		INSERT INTO ledger_messages (message_id, guild_id, channel_id, user_id)
-		VALUES ($1, $2, $3, $4)
-	`, messageId, guildId, channelId, userId)
-	if err != nil {
-		return err
-	}
-
-	// Log contents
-	_, err = m.pool.Exec(ctx, `
-		INSERT INTO ledger_contents (message_id, content)
-		VALUES ($1, $2)
-	`, messageId, content)
-
-	return err
-}
-
-func (m *PostgresLedgerManager) LogMessageEdit(ctx context.Context, guildId string, channelId string, messageId string, userId string, content string) error {
-	// Check if message exists
-	var exists bool
-	err := m.pool.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM ledger_messages
-			WHERE message_id = $1
-		)
-	`, messageId).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		_, err := m.pool.Exec(ctx, `
-		INSERT INTO ledger_messages (message_id, guild_id, channel_id, user_id)
-		VALUES ($1, $2, $3, $4)
-		`, messageId, guildId, channelId, userId)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Update message to set is_edited to true
-	_, err = m.pool.Exec(ctx, `
-		UPDATE ledger_messages
-		SET is_edited = true
-		WHERE message_id = $1
-	`, messageId)
-	if err != nil {
-		return err
-	}
-
-	// Log contents
-	_, err = m.pool.Exec(ctx, `
-		INSERT INTO ledger_contents (message_id, content)
-		VALUES ($1, $2)
-	`, messageId, content)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *PostgresLedgerManager) LogMessageDelete(ctx context.Context, guildId string, channelId string, messageId string) error {
-	// Check if message exists
-	var exists bool
-	err := m.pool.QueryRow(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM ledger_messages
-			WHERE message_id = $1
-		)
-	`, messageId).Scan(&exists)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		_, err := m.pool.Exec(ctx, `
-		INSERT INTO ledger_messages (message_id, guild_id, channel_id)
-		VALUES ($1, $2, $3)
-	`, messageId, guildId, channelId)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Update message to set is_deleted to true
-	_, err = m.pool.Exec(ctx, `
-		UPDATE ledger_messages
-		SET is_deleted = true
-		WHERE message_id = $1
-	`, messageId)
-
-	return err
-}
-*/

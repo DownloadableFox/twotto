@@ -57,7 +57,7 @@ func InitializeWhitelistManager(pool *pgxpool.Pool) whitelist.WhitelistManager {
 }
 
 func InitializeLedgerManager(session *discordgo.Session, pool *pgxpool.Pool) ledger.LedgerManager {
-	wire.Build(ledger.NewPostgresLedgerManager)
+	wire.Build(ledger.NewRepoLedgerManager, ledger.NewLedgerPostgresRepository)
 	return nil
 }
 
