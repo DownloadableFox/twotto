@@ -76,7 +76,7 @@ func HandleErrorTestCommand(_ context.Context, s *discordgo.Session, e *discordg
 				Embeds: []*discordgo.MessageEmbed{
 					{
 						Title:       "Meow! :3",
-						Color:       0xAE00FF,
+						Color:       core.ColorResult,
 						Description: "This is a funny & quirky response! Totally not going to die in the next 2 nanoseconds. An error is about to occur after this, depending on the handling something might or not happen.",
 					},
 				},
@@ -94,16 +94,7 @@ func HandleErrorTestCommand(_ context.Context, s *discordgo.Session, e *discordg
 
 		response := &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Flags: discordgo.MessageFlagsEphemeral,
-				Embeds: []*discordgo.MessageEmbed{
-					{
-						Title:       "Welp this hurts!",
-						Color:       0xAE00FF,
-						Description: "A panic is going to happen in my runtime in the next instants. Please beware that if unhandled correctly this might make me despawn (exit on failure) which wouldn't be optimal.",
-					},
-				},
-			},
+			Data: &discordgo.InteractionResponseData{},
 		}
 
 		if err := s.InteractionRespond(e.Interaction, response); err != nil {
@@ -112,7 +103,16 @@ func HandleErrorTestCommand(_ context.Context, s *discordgo.Session, e *discordg
 	case "panic":
 		response := &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{},
+			Data: &discordgo.InteractionResponseData{
+				Flags: discordgo.MessageFlagsEphemeral,
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Title:       "Welp this hurts!",
+						Color:       core.ColorResult,
+						Description: "A panic is going to happen in my runtime in the next instants. Please beware that if unhandled correctly this might make me despawn (exit on failure) which wouldn't be optimal.",
+					},
+				},
+			},
 		}
 
 		if err := s.InteractionRespond(e.Interaction, response); err != nil {
@@ -142,7 +142,7 @@ func HandlePingCommand(_ context.Context, s *discordgo.Session, e *discordgo.Int
 			Embeds: []*discordgo.MessageEmbed{
 				{
 					Title:       "Pong! :3",
-					Color:       0xAE00FF,
+					Color:       core.ColorInfo,
 					Description: fmt.Sprintf("I am alive and well! Server time is <t:%d:f>.", time.Now().Unix()),
 				},
 			},

@@ -27,7 +27,7 @@ func MidwarePerformance[T any](tag *core.Identifier) core.MiddlewareFunc[T] {
 
 func CreateErrorEmbed(err error, id xid.ID) *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{
-		Color:       0xFF003D,
+		Color:       core.ColorError,
 		Title:       "Oh no! :(",
 		Description: "Sorry! An unexpected error occurred while executing this event.\nIf this keeps happening contact <@556132236697665547>.",
 		Fields: []*discordgo.MessageEmbedField{
@@ -54,7 +54,7 @@ func CreateErrorEmbed(err error, id xid.ID) *discordgo.MessageEmbed {
 
 func CreateFatalErrorEmbed(id xid.ID) *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{
-		Color:       0xFF003D,
+		Color:       core.ColorError,
 		Title:       "Fatal! -w-",
 		Description: "You have encountered a fatal error! This should never happen.\nIf this keeps happening contact <@556132236697665547>.",
 		Fields: []*discordgo.MessageEmbedField{

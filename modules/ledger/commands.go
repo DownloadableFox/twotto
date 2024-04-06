@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/downloadablefox/twotto/core"
 	"github.com/rs/zerolog/log"
 )
 
@@ -82,8 +83,8 @@ func HandleEnableLedgerCommand(ctx context.Context, s *discordgo.Session, i *dis
 	// Respond to interaction
 	embed := &discordgo.MessageEmbed{
 		Title:       "Ledger enabled",
-		Color:       0x003DFF,
 		Description: "The ledger module has been enabled and messages will now be logged to <#" + channel.ID + ">",
+		Color:       core.ColorSuccess,
 	}
 
 	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
@@ -109,8 +110,8 @@ func HandleDisableLedgerCommand(ctx context.Context, s *discordgo.Session, i *di
 	// Respond to interaction
 	embed := &discordgo.MessageEmbed{
 		Title:       "Ledger disabled",
-		Color:       0x003DFF,
 		Description: "The ledger module has been disabled and messages will no longer be logged",
+		Color:       core.ColorWarning,
 	}
 
 	_, err = s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{

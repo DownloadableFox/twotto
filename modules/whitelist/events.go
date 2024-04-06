@@ -24,7 +24,7 @@ func CreateKickInfoEmbed(session *discordgo.Session, userId string, guildId stri
 	return &discordgo.MessageEmbed{
 		Title:       "Sorry! :(",
 		Description: fmt.Sprintf("You have been kicked from the server `%s` because you are not whitelisted.\nIf this is an error please contact <@556132236697665547> and give her your user ID.", guild.Name),
-		Color:       0xff003d,
+		Color:       core.ColorWarning,
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "User ID",

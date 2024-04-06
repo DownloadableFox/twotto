@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/downloadablefox/twotto/core"
 )
 
 var WhitelistCommandPermissions int64 = discordgo.PermissionAdministrator
@@ -164,7 +165,7 @@ func HandleWhitelistCommandAdd(ctx context.Context, s *discordgo.Session, e *dis
 	embed := &discordgo.MessageEmbed{
 		Title:       "User Whitelisted",
 		Description: fmt.Sprintf("The user <@%s> has been added to the whitelist.", userId),
-		Color:       0xAE00FF,
+		Color:       core.ColorSuccess,
 	}
 
 	// Edit the response
@@ -195,7 +196,7 @@ func HandleWhitelistCommandRemove(ctx context.Context, s *discordgo.Session, e *
 	embed := &discordgo.MessageEmbed{
 		Title:       "User Removed from Whitelist",
 		Description: fmt.Sprintf("The user <@%s> has been removed from the whitelist.", userId),
-		Color:       0xAE00FF,
+		Color:       core.ColorWarning,
 	}
 
 	// Edit the response
@@ -224,7 +225,7 @@ func HandleWhitelistCommandList(ctx context.Context, s *discordgo.Session, e *di
 	embed := &discordgo.MessageEmbed{
 		Title:       "Whitelist",
 		Description: fmt.Sprintf("There are %d users on the whitelist.", len(whitelist)),
-		Color:       0xAE00FF,
+		Color:       core.ColorInfo,
 	}
 
 	// Edit the response
@@ -252,7 +253,7 @@ func HandleWhitelistCommandClear(ctx context.Context, s *discordgo.Session, e *d
 	embed := &discordgo.MessageEmbed{
 		Title:       "Whitelist Cleared",
 		Description: "The whitelist has been cleared.",
-		Color:       0xAE00FF,
+		Color:       core.ColorSuccess,
 	}
 
 	// Edit the response
@@ -292,7 +293,7 @@ func HandleWhitelistCommandAddAll(ctx context.Context, s *discordgo.Session, e *
 	embed := &discordgo.MessageEmbed{
 		Title:       "All Users Whitelisted",
 		Description: fmt.Sprintf("All %d users in the guild have been added to the whitelist.", len(members)),
-		Color:       0xAE00FF,
+		Color:       core.ColorSuccess,
 	}
 
 	// Edit the response
@@ -345,7 +346,7 @@ func HandleWhitelistCommandConfigEnable(ctx context.Context, s *discordgo.Sessio
 	embed := &discordgo.MessageEmbed{
 		Title:       "Whitelist Enabled",
 		Description: "The whitelist has been enabled.",
-		Color:       0xAE00FF,
+		Color:       core.ColorSuccess,
 	}
 
 	// Edit the response
@@ -373,7 +374,7 @@ func HandleWhitelistCommandConfigDisable(ctx context.Context, s *discordgo.Sessi
 	embed := &discordgo.MessageEmbed{
 		Title:       "Whitelist Disabled",
 		Description: "The whitelist has been disabled.",
-		Color:       0xAE00FF,
+		Color:       core.ColorWarning,
 	}
 
 	// Edit the response
@@ -399,7 +400,7 @@ func HandleWhitelistCommandConfigStatus(ctx context.Context, s *discordgo.Sessio
 	embed := &discordgo.MessageEmbed{
 		Title:       "Whitelist Status",
 		Description: fmt.Sprintf("The whitelist is currently %s.", map[bool]string{true: "enabled", false: "disabled"}[enabled]),
-		Color:       0xAE00FF,
+		Color:       core.ColorInfo,
 	}
 
 	// Edit the response
@@ -430,7 +431,7 @@ func HandleWhitelistCommandConfigSetRole(ctx context.Context, s *discordgo.Sessi
 	embed := &discordgo.MessageEmbed{
 		Title:       "Default Role Set",
 		Description: fmt.Sprintf("The default role has been set to <@&%s>.", role.ID),
-		Color:       0xAE00FF,
+		Color:       core.ColorSuccess,
 	}
 
 	// Edit the response
@@ -458,7 +459,7 @@ func HandleWhitelistCommandConfigClearRole(ctx context.Context, s *discordgo.Ses
 	embed := &discordgo.MessageEmbed{
 		Title:       "Default Role Cleared",
 		Description: "The default role has been cleared.",
-		Color:       0xAE00FF,
+		Color:       core.ColorWarning,
 	}
 
 	// Edit the response
@@ -489,7 +490,7 @@ func HandleWhitelistCommandConfigSetRemoveOnBan(ctx context.Context, s *discordg
 	embed := &discordgo.MessageEmbed{
 		Title:       "Remove on Ban Set",
 		Description: fmt.Sprintf("Users will now %s be removed from the whitelist when they are banned.", map[bool]string{true: "", false: "not"}[enabled]),
-		Color:       0xAE00FF,
+		Color:       map[bool]int{true: core.ColorSuccess, false: core.ColorWarning}[enabled],
 	}
 
 	// Edit the response

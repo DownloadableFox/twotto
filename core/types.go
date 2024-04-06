@@ -5,6 +5,14 @@ import (
 	"regexp"
 )
 
+const (
+	ColorInfo    = 0x003DFF
+	ColorResult  = 0xAE00FF
+	ColorSuccess = 0x23DB08
+	ColorWarning = 0xFFD700
+	ColorError   = 0xFF003D
+)
+
 var (
 	ErrInvalidIdentifier = errors.New("invalid identifier")
 	NamespaceRegex       = regexp.MustCompile(`[a-z0-9-]{1,32}`)

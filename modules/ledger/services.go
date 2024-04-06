@@ -423,7 +423,7 @@ func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *disco
 	// Send message to log channel
 	embed := &discordgo.MessageEmbed{
 		Title: "Message Deleted",
-		Color: 0xFF003D,
+		Color: core.ColorError,
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Content",
@@ -517,7 +517,7 @@ func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discord
 	// Send message to log channel
 	embed := &discordgo.MessageEmbed{
 		Title: "Message Edited",
-		Color: 0x003DFF,
+		Color: core.ColorInfo,
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Content",
