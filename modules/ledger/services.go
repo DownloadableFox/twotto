@@ -3,6 +3,7 @@ package ledger
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/core"
@@ -422,15 +423,24 @@ func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *disco
 	// Send message to log channel
 	embed := &discordgo.MessageEmbed{
 		Title: "Message Deleted",
-		Color: 0x003DFF,
+		Color: 0xFF003D,
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:  "Content",
 				Value: message.Content,
 			},
 			{
-				Name:   "Author",
+				Name:  "URL",
+				Value: fmt.Sprintf("https://discord.com/channels/%s/%s/%s", message.GuildID, message.ChannelID, message.ID),
+			},
+			{
+				Name:   "Author Mention",
 				Value:  message.Author.Mention(),
+				Inline: true,
+			},
+			{
+				Name:   "Author ID/Tag",
+				Value:  fmt.Sprintf("`%s` /\n `%s`", message.Author.ID, message.Author.String()),
 				Inline: true,
 			},
 			{
@@ -439,11 +449,9 @@ func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *disco
 				Inline: true,
 			},
 		},
-		Author: &discordgo.MessageEmbedAuthor{
-			Name:    message.Author.Username + "#" + message.Author.Discriminator,
-			IconURL: message.Author.AvatarURL(""),
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: fmt.Sprintf("%s • %s", message.ID, message.Timestamp.Format("01/02/2006, 3:04:05 PM")),
 		},
-		Timestamp: message.Timestamp.String(),
 	}
 
 	_, err = m.session.ChannelMessageSendEmbed(channelId, embed)
@@ -473,7 +481,7 @@ func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discord
 
 	previous := "`no content saved in database`"
 	if len(contents) > 0 {
-		previous = contents[0].Content
+		previous = contents[len(contents)-1].Content
 	}
 
 	// Save in database
@@ -509,19 +517,28 @@ func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discord
 	// Send message to log channel
 	embed := &discordgo.MessageEmbed{
 		Title: "Message Edited",
-		Color: 0xFF003D,
+		Color: 0x003DFF,
 		Fields: []*discordgo.MessageEmbedField{
 			{
-				Name:  "Old Content",
-				Value: previous,
-			},
-			{
-				Name:  "New Content",
+				Name:  "Content",
 				Value: message.Content,
 			},
 			{
-				Name:   "Author",
+				Name:  "Previous Content",
+				Value: previous,
+			},
+			{
+				Name:  "URL",
+				Value: fmt.Sprintf("https://discord.com/channels/%s/%s/%s", message.GuildID, message.ChannelID, message.ID),
+			},
+			{
+				Name:   "Author Mention",
 				Value:  message.Author.Mention(),
+				Inline: true,
+			},
+			{
+				Name:   "Author ID/Tag",
+				Value:  fmt.Sprintf("`%s` /\n `%s`", message.Author.ID, message.Author.String()),
 				Inline: true,
 			},
 			{
@@ -530,11 +547,9 @@ func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discord
 				Inline: true,
 			},
 		},
-		Author: &discordgo.MessageEmbedAuthor{
-			Name:    message.Author.Username + "#" + message.Author.Discriminator,
-			IconURL: message.Author.AvatarURL(""),
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: fmt.Sprintf("%s • %s", message.ID, message.Timestamp.Format("01/02/2006, 3:04:05 PM")),
 		},
-		Timestamp: message.Timestamp.String(),
 	}
 
 	_, err = m.session.ChannelMessageSendEmbed(channelId, embed)
