@@ -25,8 +25,5 @@ COPY . .
 # Generate the Go application
 RUN make generate
 
-# Change the permissions of the binary
-RUN chmod +x ./bin/bot
-
 # Set the command to run the executable
 CMD ["make", "run"]
