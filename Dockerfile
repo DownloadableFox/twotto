@@ -8,13 +8,13 @@ ENV COMMIT_SHA=${COMMIT_SHA}
 # Set the working directory inside the container
 WORKDIR /app
 
-# Download dependencies like make, google wire & go-migrate
-RUN apt-get update && apt-get install -y make 
-RUN go get github.com/google/wire/cmd/wire
-RUN go get -u -d github.com/golang-migrate/migrate/cmd/migrate
-
 # Copy the Go module files
 COPY go.mod go.sum ./
+
+# Download dependencies like make, google wire & go-migrate
+RUN apt-get update && apt-get install -y make 
+RUN go install github.com/google/wire/cmd/wire@latest
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Download and install the Go dependencies
 RUN go mod download
