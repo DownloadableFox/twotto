@@ -1,6 +1,10 @@
 # Use the official Go image as the base image
 FROM golang:latest
 
+# Set environment variables
+ARG COMMIT_SHA
+ENV COMMIT_SHA=${COMMIT_SHA}
+
 # Set the working directory inside the container
 WORKDIR /app
 
