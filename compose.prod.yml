@@ -1,23 +1,23 @@
 services:
   bot:
     image: ghcr.io/downloadablefox/twotto:main
+    container_name: zwerl-twotto
+    restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://twotto:<password goes here>@postgres:5432/twoto-prod
-      - DEBUG=true
-      - TOKEN=<token goes here>
-
-  postgres:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      DEBUG: ${DEBUG}
+      TOKEN: ${TOKEN}
+    depends_on:
+      - db
+  db:
     image: postgres:12
+    container_name: zwerl-twotto-pg
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: twotto
-      POSTGRES_PASSWORD: <password goes here>
-      POSTGRES_DB: twoto-prod
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - ./data:/var/lib/postgresql/data
-
-  adminer:
-    image: adminer
-    ports:
-      - "8080:8080"
+      - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:
