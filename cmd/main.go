@@ -1,30 +1,25 @@
 package main
 
 import (
-	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/cristalhq/aconfig"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 var (
-	ConfigFile string
-	BotConfig  *Config
+	BotConfig Config
 )
 
 func init() {
-	// Parse flags
-	flag.StringVar(&ConfigFile, "config", "config.json", "Path to the config file")
-	flag.Parse()
-
 	// Load config
-	var err error
-	if BotConfig, err = LoadConfig(ConfigFile); err != nil {
-		log.Fatal().Err(err).Msg("Failed to load config file!")
+	loader := aconfig.LoaderFor(&BotConfig, aconfig.Config{})
+	if err := loader.Load(); err != nil {
+		panic(err)
 	}
 
 	// Set log level
@@ -39,11 +34,11 @@ func init() {
 func main() {
 	client, err := discordgo.New("Bot " + BotConfig.Token)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("Failed to create Discord client!")
 	}
 
 	// Bootstrap
-	if err := bootstrap(client, BotConfig); err != nil {
+	if err := bootstrap(client, &BotConfig); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bootstrap bot!")
 	}
 

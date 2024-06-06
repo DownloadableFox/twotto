@@ -5,8 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/modules/debug"
@@ -15,27 +13,12 @@ import (
 	"github.com/downloadablefox/twotto/modules/whitelist"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
-)
+)	
 
 type Config struct {
-	Token       string `json:"token"`
-	Debug       bool   `json:"debug"`
-	DatabaseURL string `json:"database_url"`
-}
-
-func LoadConfig(filename string) (*Config, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	config := &Config{}
-	if err = json.NewDecoder(file).Decode(config); err != nil {
-		return nil, err
-	}
-
-	return config, nil
+	Token       string `usage:"Discord bot token" required:"true" env:"TOKEN"`
+	Debug       bool   `usage:"Enable debug mode" default:"false" env:"DEBUG"`
+	DatabaseURL string `usage:"Postgres database URL" required:"true" env:"DATABASE_URL"`
 }
 
 func InitializeDatabasePool(config *Config) (*pgxpool.Pool, error) {
