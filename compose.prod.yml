@@ -1,0 +1,23 @@
+services:
+  bot:
+    image: ghcr.io/downloadablefox/twotto:main
+    environment:
+      - DATABASE_URL=postgresql://twotto:<password goes here>@postgres:5432/twoto-prod
+      - DEBUG=true
+      - TOKEN=<token goes here>
+
+  postgres:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: twotto
+      POSTGRES_PASSWORD: <password goes here>
+      POSTGRES_DB: twoto-prod
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
