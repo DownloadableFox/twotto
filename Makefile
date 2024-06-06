@@ -19,7 +19,7 @@ migrate-down:
 	@if [ -z ${DATABASE_URL} ]; then echo "DATABASE_URL is not set"; exit 1; fi
 	@migrate -path ./migrations -database "${DATABASE_URL}" down
 
-run: 
+run: migrate-up
 	@go run ./cmd/...
 
 bootstrap: migrate-up

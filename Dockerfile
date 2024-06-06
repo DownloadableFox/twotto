@@ -22,11 +22,11 @@ RUN go mod download
 # Copy the source code into the container
 COPY . .
 
-# Build the Go application
-RUN make build
+# Generate the Go application
+RUN make generate
 
-# Expose the port that the application listens on
-EXPOSE 8080
+# Change the permissions of the binary
+RUN chmod +x ./bin/bot
 
 # Set the command to run the executable
-CMD ["make", "bootstrap"]
+CMD ["make", "run"]
