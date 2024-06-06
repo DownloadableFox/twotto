@@ -13,11 +13,11 @@ build: generate
 # Use go-migrate to run migrations using the environment variables
 migrate-up:
 	@if [ -z ${DATABASE_URL} ]; then echo "DATABASE_URL is not set"; exit 1; fi
-	@migrate -path ./migrations -database ${DATABASE_URL} up
+	@migrate -path ./migrations -database "${DATABASE_URL}" up
 
 migrate-down:
 	@if [ -z ${DATABASE_URL} ]; then echo "DATABASE_URL is not set"; exit 1; fi
-	@migrate -path ./migrations -database ${DATABASE_URL} down
+	@migrate -path ./migrations -database "${DATABASE_URL}" down
 
 run: 
 	@go run ./cmd/...
