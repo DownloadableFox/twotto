@@ -61,12 +61,14 @@ func (e *E621Service) GetRandomPost() (*E621Post, error) {
 	}
 	defer resp.Body.Close()
 
-	var post E621PostResponse
+	var post struct {
+		Post E621PostResponse `json:"post"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&post); err != nil {
 		return nil, err
 	}
 
-	return e.parsePost(&post)
+	return e.parsePost(&post.Post)
 }
 
 func (e *E621Service) GetPostByID(id int) (*E621Post, error) {
@@ -85,12 +87,14 @@ func (e *E621Service) GetPostByID(id int) (*E621Post, error) {
 	}
 	defer resp.Body.Close()
 
-	var post E621PostResponse
+	var post struct {
+		Post E621PostResponse `json:"post"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&post); err != nil {
 		return nil, err
 	}
 
-	return e.parsePost(&post)
+	return e.parsePost(&post.Post)
 }
 
 func (e *E621Service) SearchPosts(query string, limit, page int) ([]*E621Post, error) {
