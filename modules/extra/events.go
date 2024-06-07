@@ -6,7 +6,22 @@ import (
 	"regexp"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/downloadablefox/twotto/core"
+	"github.com/rs/zerolog/log"
 )
+
+func HandleOnReadyEvent(ctx context.Context, s *discordgo.Session, e *discordgo.Ready) error {
+	// Register commands
+	err := core.ApplyCommands(
+		SayCommand,
+	).For(s, "")
+	if err != nil {
+		log.Warn().Err(err).Msg("[DebugModule] Failed to register commands")
+		return err
+	}
+
+	return nil
+}
 
 var (
 	TwitterLinkRegex = regexp.MustCompile(`(https?://)?(www\.)?(twitter|x)\.com/([a-zA-Z0-9_]+/status/[0-9]+)`)
