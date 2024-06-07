@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/downloadablefox/twotto/core"
 )
 
 var (
@@ -47,7 +48,7 @@ func HandleSayCommand(_ context.Context, s *discordgo.Session, e *discordgo.Inte
 	embed := &discordgo.MessageEmbed{
 		Title:       "Message Sent",
 		Description: data.Options[0].StringValue(),
-		Color:       0x00ff00,
+		Color:       core.ColorSuccess,
 	}
 
 	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
