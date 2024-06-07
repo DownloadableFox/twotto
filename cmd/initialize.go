@@ -8,12 +8,13 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/modules/debug"
+	"github.com/downloadablefox/twotto/modules/e621"
 	"github.com/downloadablefox/twotto/modules/extra"
 	"github.com/downloadablefox/twotto/modules/ledger"
 	"github.com/downloadablefox/twotto/modules/whitelist"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
-)	
+)
 
 type Config struct {
 	Token       string `usage:"Discord bot token" required:"true" env:"TOKEN"`
@@ -62,6 +63,9 @@ func bootstrap(client *discordgo.Session, config *Config) error {
 
 	ledgerManager := InitializeLedgerManager(client, pool)
 	ledger.RegisterModule(client, ledgerManager)
+
+	e621Client := e621.NewE621Service("twotto/1.0 (DownloadableFox)")
+	e621.RegisterModule(client, e621Client)
 
 	return nil
 }
