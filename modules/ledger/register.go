@@ -25,7 +25,7 @@ func RegisterModule(client *discordgo.Session, ledger LedgerManager) {
 	)
 	client.AddHandler(core.HandleEvent(deleteMessage))
 
-	onReadyIdent := core.NewIdentifier("ledger", "event/ready")
+	onReadyIdent := core.NewIdentifier("ledger", "event/setup")
 	onReady := core.ApplyMiddlewares(
 		HandleOnReadyEvent,
 		debug.MidwareContextInject[discordgo.Ready](LedgerManagerKey, ledger),
