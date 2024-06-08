@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/core"
@@ -41,7 +42,7 @@ var YiffCommand = core.NewCommandBuilder().
 	AddSubCommand(func(subcommand *core.SubCommandBuilder) {
 		subcommand.SetName("post").
 			SetDescription("Given an ID it retrives a post.").
-			AddStringOption(func(s *core.StringOptionBuilder) {
+			AddIntegerOption(func(s *core.IntegerOptionBuilder) {
 				s.SetName("id").
 					SetDescription("The ID of the post").
 					SetRequired(true)
@@ -110,15 +111,28 @@ func handleRandom(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 
 	// Send the post
 	embed := GeneratePostEmbed(post)
-	attachment := &discordgo.MessageAttachment{
-		URL:      post.URL,
-		Filename: fmt.Sprintf("post-%d.%s", post.ID, post.Ext),
+
+	// Create file request
+	req, err := http.NewRequest(http.MethodGet, post.URL, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	file := &discordgo.File{
+		Name:   fmt.Sprintf("post-%d.%s", post.ID, post.Ext),
+		Reader: res.Body,
 	}
 
 	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
-		Content:     &post.URL,
-		Embeds:      &[]*discordgo.MessageEmbed{embed},
-		Attachments: &[]*discordgo.MessageAttachment{attachment},
+		Content: &post.URL,
+		Embeds:  &[]*discordgo.MessageEmbed{embed},
+		Files:   []*discordgo.File{file},
 	}); err != nil {
 		return err
 	}
@@ -130,6 +144,51 @@ func handleSearch(_ context.Context, _ *discordgo.Session, _ *discordgo.Interact
 	return errors.New("not implemented")
 }
 
-func handlePost(_ context.Context, _ *discordgo.Session, _ *discordgo.InteractionCreate) error {
-	return errors.New("not implemented")
+func handlePost(ctx context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+	data := e.ApplicationCommandData().Options[0]
+
+	// Get E621 service from context
+	svc, ok := ctx.Value(E621ServiceKey).(IE621Service)
+	if !ok || svc == nil {
+		return ErrE621ServiceNotFound
+	}
+
+	// Get the post
+	postID, err := core.GetIntegerOption(data.Options, "id")
+	if err != nil {
+		return err
+	}
+
+	post, err := svc.GetPostByID(postID)
+	if err != nil {
+		return err
+	}
+
+	// Send the post
+	embed := GeneratePostEmbed(post)
+	req, err := http.NewRequest(http.MethodGet, post.URL, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	file := &discordgo.File{
+		Name:   fmt.Sprintf("post-%d.%s", post.ID, post.Ext),
+		Reader: res.Body,
+	}
+
+	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
+		Content: &post.URL,
+		Embeds:  &[]*discordgo.MessageEmbed{embed},
+		Files:   []*discordgo.File{file},
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }

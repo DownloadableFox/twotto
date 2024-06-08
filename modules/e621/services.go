@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/downloadablefox/twotto/core"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 	ErrE621ServiceNotFound = errors.New("e621 service not found")
 )
 
-const MAX_POST_SIZE = 25_000_000
+const MAX_POST_SIZE = 25 * 1024 * 1024
 
 type IE621Service interface {
 	GetRandomPost() (*E621Post, error)
@@ -72,7 +73,7 @@ func (e *E621Service) GetRandomPost() (*E621Post, error) {
 }
 
 func (e *E621Service) GetPostByID(id int) (*E621Post, error) {
-	const url = "https://e621.net/posts/%d.json"
+	url := fmt.Sprintf("https://e621.net/posts/%d.json", id)
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -155,7 +156,7 @@ func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
 			url = ""
 
 			// Attempt to get the best quality video
-			for _, alt := range post.Sample.Alts {
+			for altname, alt := range post.Sample.Alts {
 				for _, current := range alt.URLs {
 					if current == nil {
 						continue
@@ -175,13 +176,30 @@ func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
 						return nil, err
 					}
 
-					if resp.ContentLength < MAX_POST_SIZE {
+					// Read all contents of resp.Body to ensure it's not too large
+					byteCount := 0
+					buf := make([]byte, 1024)
+					for {
+						n, err := resp.Body.Read(buf)
+						byteCount += n
+						if err != nil {
+							break
+						}
+					}
+
+					log.Debug().Msgf("[E621Service] Video size for alt (%s): %.2f MB", altname, float64(byteCount)/1024.0/1024.0)
+
+					if byteCount < MAX_POST_SIZE {
 						resp.Body.Close()
 						url = *current
 						break
 					}
 
 					resp.Body.Close()
+				}
+
+				if url != "" {
+					break
 				}
 			}
 
@@ -211,7 +229,7 @@ func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
 
 	return &E621Post{
 		ID:   post.ID,
-		URL:  post.File.URL,
+		URL:  url,
 		Ext:  post.File.Ext,
 		Size: post.File.Size,
 	}, nil
