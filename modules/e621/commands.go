@@ -51,7 +51,20 @@ var YiffCommand = core.NewCommandBuilder().
 
 func GeneratePostEmbed(post *E621Post) *discordgo.MessageEmbed {
 	embed := &discordgo.MessageEmbed{
-		Title: fmt.Sprintf("Post #%d", post.ID),
+		Title:       fmt.Sprintf("E621 Post #%d", post.ID),
+		Description: "You can find this post by clicking on the following URL.",
+		Fields: []*discordgo.MessageEmbedField{
+			{
+				Name:   "Extension",
+				Value:  fmt.Sprintf("`%s`", post.Ext),
+				Inline: true,
+			},
+			{
+				Name:   "Size",
+				Value:  fmt.Sprintf("%.2f MB", float64(post.Size)/10000.0),
+				Inline: true,
+			},
+		},
 		URL:   fmt.Sprintf("https://e621.net/posts/%d", post.ID),
 		Color: core.ColorInfo,
 	}
@@ -97,9 +110,15 @@ func handleRandom(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 
 	// Send the post
 	embed := GeneratePostEmbed(post)
+	attachment := &discordgo.MessageAttachment{
+		URL:      post.URL,
+		Filename: fmt.Sprintf("post-%d.%s", post.ID, post.Ext),
+	}
+
 	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
-		Content: &post.URL,
-		Embeds:  &[]*discordgo.MessageEmbed{embed},
+		Content:     &post.URL,
+		Embeds:      &[]*discordgo.MessageEmbed{embed},
+		Attachments: &[]*discordgo.MessageAttachment{attachment},
 	}); err != nil {
 		return err
 	}
