@@ -301,7 +301,7 @@ func handleSearch(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{{
 			Title:       "Posts sent!",
-			Description: "Found posts have been sent below!\n**Note:**Some files might have been ommited as they were too large to send (25MB limit).",
+			Description: "Found posts have been sent below! **Note: **Some files might have been ommited as they were too large to send (25MB limit).",
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Tags",

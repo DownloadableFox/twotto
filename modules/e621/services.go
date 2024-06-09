@@ -198,7 +198,7 @@ func (e *E621Service) FindSuitableSample(post *E621PostResponse) (string, error)
 
 			for _, url := range alt.URLs {
 				// Skip if the URL is nil
-				if url == nil {
+				if url == nil || *url == "" {
 					continue
 				}
 
