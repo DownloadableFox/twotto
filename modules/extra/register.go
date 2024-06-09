@@ -7,6 +7,14 @@ import (
 )
 
 func RegisterModule(client *discordgo.Session) {
+	// Add on ready event
+	onReadyIdent := core.NewIdentifier("extra", "events/setup")
+	onReady := core.ApplyMiddlewares(
+		HandleOnReadyEvent,
+		debug.MidwarePerformance[discordgo.Ready](onReadyIdent),
+	)
+	client.AddHandler(core.HandleEvent(onReady))
+
 	// Add say command
 	sayCommandIdent := core.NewIdentifier("extra", "commands/say")
 	sayCommand := core.ApplyMiddlewares(
