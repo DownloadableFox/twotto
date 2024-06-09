@@ -483,11 +483,11 @@ func (m *RepoLedgerManager) LogMessageDelete(ctx context.Context, message *disco
 }
 
 func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discordgo.MessageUpdate) error {
-	if message.Author.Bot || message.GuildID == "" {
+	if message.Message == nil || message.Author == nil {
 		return nil
 	}
 
-	if message.Message == nil {
+	if message.Author.Bot || message.GuildID == "" {
 		return nil
 	}
 

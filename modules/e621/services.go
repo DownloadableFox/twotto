@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/downloadablefox/twotto/core"
@@ -69,7 +70,7 @@ func (e *E621Service) GetRandomPost() (*E621Post, error) {
 		return nil, err
 	}
 
-	return e.parsePost(&post.Post)
+	return e.ParsePost(&post.Post)
 }
 
 func (e *E621Service) GetPostByID(id int) (*E621Post, error) {
@@ -95,7 +96,7 @@ func (e *E621Service) GetPostByID(id int) (*E621Post, error) {
 		return nil, err
 	}
 
-	return e.parsePost(&post.Post)
+	return e.ParsePost(&post.Post)
 }
 
 func (e *E621Service) SearchPosts(tags string, limit, page int) ([]*E621Post, error) {
@@ -131,7 +132,7 @@ func (e *E621Service) SearchPosts(tags string, limit, page int) ([]*E621Post, er
 
 	var result []*E621Post
 	for _, post := range posts.Posts {
-		parsed, err := e.parsePost(post)
+		parsed, err := e.ParsePost(post)
 		if err != nil {
 			continue
 		}
@@ -142,114 +143,140 @@ func (e *E621Service) SearchPosts(tags string, limit, page int) ([]*E621Post, er
 	return result, nil
 }
 
-func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
+type File struct {
+	ContentLength int
+	URL           string
+}
+
+func (e *E621Service) GetContentLength(url string) (int, error) {
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	req.Header.Set("User-Agent", e.userAgent)
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.ContentLength != -1 {
+		return int(resp.ContentLength), nil
+	}
+
+	// If the content length is not provided, we have to download the file
+	resp, err = e.httpClient.Get(url)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	return int(resp.ContentLength), nil
+}
+
+func (e *E621Service) FindSuitableSample(post *E621PostResponse) (string, error) {
+	useSample := post.File.Size > MAX_POST_SIZE
+	isVideo := post.File.Ext == "webm" || post.File.Ext == "mp4"
+
+	// If sample is not required, just return the original
+	if !useSample {
+		return post.File.URL, nil
+	}
+
+	// If the post is too large and we can use the sample, use it
+	if !post.Sample.Has {
+		return "", errors.New("post is too large and has no samples")
+	}
+
+	// If the post is a video, we find the best fit
+	if isVideo {
+		possible := make([]File, 0)
+		for _, alt := range post.Sample.Alts {
+			var file *File
+
+			for _, url := range alt.URLs {
+				// Skip if the URL is nil
+				if url == nil {
+					continue
+				}
+
+				// Get the content length
+				length, err := e.GetContentLength(*url)
+				if err != nil {
+					continue
+				}
+
+				// Skip if the file is too large
+				if length > MAX_POST_SIZE {
+					continue
+				}
+
+				// If the file is smaller than the current file, replace it
+				if file == nil || length < file.ContentLength {
+					file = &File{
+						ContentLength: length,
+						URL:           *url,
+					}
+				}
+			}
+
+			if file != nil {
+				possible = append(possible, *file)
+			}
+		}
+
+		// If we have no possible files, return an error
+		if len(possible) == 0 {
+			return "", errors.New("no suitable samples found")
+		}
+
+		// Find the biggest file
+		var biggest *File
+		for _, file := range possible {
+			if biggest == nil || file.ContentLength > biggest.ContentLength {
+				biggest = &file
+			}
+		}
+
+		return biggest.URL, nil
+	}
+
+	// If the post is an image, we just return the sample
+	length, err := e.GetContentLength(post.Sample.URL)
+	if err != nil {
+		return "", err
+	}
+
+	// If the sample is too large, return an error
+	if length > MAX_POST_SIZE {
+		return "", errors.New("sample is too large")
+	}
+
+	return post.Sample.URL, nil
+}
+
+func (e *E621Service) ParsePost(post *E621PostResponse) (*E621Post, error) {
 	if post.ID == 0 {
 		return nil, errors.New("post was not found")
 	}
 
-	useSample := post.File.Size > MAX_POST_SIZE
-
-	// If the post is too large and we can use the sample, use it
-	if useSample && !post.Sample.Has {
-		return nil, errors.New("post is too large and has no samples")
+	// Find the suitable sample
+	url, err := e.FindSuitableSample(post)
+	if err != nil {
+		return nil, err
 	}
 
-	isVideo := post.File.Ext == "webm" || post.File.Ext == "mp4"
+	// Get the extension
+	parts := strings.Split(url, ".")
+	ext := parts[len(parts)-1]
 
-	url := post.File.URL
-	if useSample {
-		if isVideo {
-			url = ""
-
-			// Attempt to get the best quality video
-			for altname, alt := range post.Sample.Alts {
-				for _, current := range alt.URLs {
-					if current == nil {
-						continue
-					}
-
-					// Download the video and check the size
-					// If it's smaller than the max size, use it
-					req, err := http.NewRequest(http.MethodGet, *current, nil)
-					if err != nil {
-						return nil, err
-					}
-
-					req.Header.Set("User-Agent", e.userAgent)
-
-					resp, err := e.httpClient.Do(req)
-					if err != nil {
-						return nil, err
-					}
-
-					// Read all contents of resp.Body to ensure it's not too large
-					byteCount := 0
-					buf := make([]byte, 1024)
-					for {
-						n, err := resp.Body.Read(buf)
-						byteCount += n
-						if err != nil {
-							break
-						}
-					}
-
-					log.Debug().Msgf("[E621Service] Video size for alt (%s): %.2f MB", altname, float64(byteCount)/1024.0/1024.0)
-
-					if byteCount < MAX_POST_SIZE {
-						resp.Body.Close()
-						url = *current
-						break
-					}
-
-					resp.Body.Close()
-				}
-
-				if url != "" {
-					break
-				}
-			}
-
-			if url == "" {
-				return nil, fmt.Errorf("no suitable video found")
-			}
-		} else {
-			// Check if the sample is too large
-			req, err := http.NewRequest(http.MethodGet, post.Sample.URL, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("User-Agent", e.userAgent)
-
-			resp, err := e.httpClient.Do(req)
-			if err != nil {
-				return nil, err
-			}
-
-			// Read all contents of resp.Body to ensure it's not too large
-			byteCount := 0
-			buf := make([]byte, 1024)
-			for {
-				n, err := resp.Body.Read(buf)
-				byteCount += n
-				if err != nil {
-					break
-				}
-			}
-			defer resp.Body.Close()
-
-			if byteCount > MAX_POST_SIZE {
-				return nil, errors.New("no suitable image found")
-			}
-
-			url = post.Sample.URL
-		}
-	}
-
+	// Return the post
 	return &E621Post{
 		ID:   post.ID,
 		URL:  url,
-		Ext:  post.File.Ext,
+		Ext:  ext,
 		Size: post.File.Size,
 	}, nil
 }

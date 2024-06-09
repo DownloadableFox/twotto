@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/core"
+	"github.com/rs/zerolog/log"
 )
 
 // Now using the new command builder
@@ -141,6 +141,68 @@ func handleRandom(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 	return nil
 }
 
+func publishThread(s *discordgo.Session, channelID, messageID, tags string, posts []*E621Post) error {
+	// Assume
+	success := true
+
+	// Create a thread to send the posts
+	thr, err := s.MessageThreadStartComplex(channelID, messageID, &discordgo.ThreadStart{
+		Name:                fmt.Sprintf("Posts with tags `%s`", tags),
+		AutoArchiveDuration: 60, // 1 hour
+		Invitable:           true,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Send the posts
+	for _, post := range posts {
+		s.ChannelTyping(thr.ID)
+
+		embed := GeneratePostEmbed(post)
+		req, err := http.NewRequest(http.MethodGet, post.URL, nil)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[E621YiffSearchCommand] Failed to create request for post #%d (source: %s)", post.ID, post.URL)
+			success = false
+			continue
+		}
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Warn().Err(err).Msgf("[E621YiffSearchCommand] Failed to download post #%d (source: %s)", post.ID, post.URL)
+			success = false
+			continue
+		}
+		defer res.Body.Close()
+
+		file := &discordgo.File{
+			Name:   fmt.Sprintf("post-%d.%s", post.ID, post.Ext),
+			Reader: res.Body,
+		}
+
+		if _, err := s.ChannelMessageSendComplex(thr.ID, &discordgo.MessageSend{
+			Embed: embed,
+			Files: []*discordgo.File{file},
+		}); err != nil {
+			log.Warn().Err(err).Msgf("[E621YiffSearchCommand] Failed to send post #%d (source: %s)", post.ID, post.URL)
+			success = false
+			continue
+		}
+	}
+
+	if !success {
+		s.ChannelMessageSendComplex(thr.ID, &discordgo.MessageSend{
+			Embeds: []*discordgo.MessageEmbed{{
+				Title:       "Failed to send some posts!",
+				Description: "There was an issue sending some posts. These posts were omitted from the thread!",
+				Color:       core.ColorWarning,
+			}},
+		})
+	}
+
+	return nil
+}
+
 func handleSearch(ctx context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
 	data := e.ApplicationCommandData().Options[0]
 
@@ -221,66 +283,25 @@ func handleSearch(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 		return nil
 	}
 
-	// Create a thread to send the posts
-	thr, err := s.MessageThreadStartComplex(msg.ChannelID, msg.ID, &discordgo.ThreadStart{
-		Name:                fmt.Sprintf("Posts with tags `%s`", tags),
-		AutoArchiveDuration: 60, // 1 hour
-		Invitable:           true,
-	})
-	if err != nil {
-		return err
-	}
-
-	// Send the posts
-	for _, post := range posts {
-		s.ChannelTyping(thr.ID)
-
-		embed := GeneratePostEmbed(post)
-		req, err := http.NewRequest(http.MethodGet, post.URL, nil)
-		if err != nil {
-			return err
-		}
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer res.Body.Close()
-
-		// Get extension
-		extensions := strings.Split(post.URL, ".")
-		ext := extensions[len(extensions)-1]
-
-		file := &discordgo.File{
-			Name:   fmt.Sprintf("post-%d.%s", post.ID, ext),
-			Reader: res.Body,
-		}
-
-		if _, err := s.ChannelMessageSendComplex(thr.ID, &discordgo.MessageSend{
-			Embed: embed,
-			Files: []*discordgo.File{file},
-		}); err != nil {
-			return err
-		}
-	}
-
-	if len(posts) != limit {
-		if _, err := s.ChannelMessageSendComplex(thr.ID, &discordgo.MessageSend{
-			Embeds: []*discordgo.MessageEmbed{{
-				Title:       "No more posts!",
-				Description: "Due to Discord limitations, some posts may not be displayed.\nThese posts were omitted from the thread!",
-				Color:       core.ColorWarning,
+	// Send the posts to a thread
+	if err := publishThread(s, msg.ChannelID, msg.ID, tags, posts); err != nil {
+		// Operation cancelled
+		s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
+			Embeds: &[]*discordgo.MessageEmbed{{
+				Title:       "Operation cancelled! :(",
+				Description: "There was an issue sending the posts to a thread.",
+				Color:       core.ColorError,
 			}},
-		}); err != nil {
-			return err
-		}
+		})
+
+		return err
 	}
 
 	// Update interaction
 	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{{
 			Title:       "Posts sent!",
-			Description: fmt.Sprintf("Found posts have been sent to <#%s>", thr.ID),
+			Description: "Found posts have been sent below!\n**Note:**Some files might have been ommited as they were too large to send (25MB limit).",
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Tags",
