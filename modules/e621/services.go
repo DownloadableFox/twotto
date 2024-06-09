@@ -180,6 +180,11 @@ func (e *E621Service) FindSuitableSample(post *E621PostResponse) (string, error)
 	useSample := post.File.Size > MAX_POST_SIZE
 	isVideo := post.File.Ext == "webm" || post.File.Ext == "mp4"
 
+	// If the post has no file URL, return an error
+	if post.File.URL == "" {
+		return "", errors.New("post is hidden for bots (requires login)")
+	}
+
 	// If sample is not required, just return the original
 	if !useSample {
 		return post.File.URL, nil
@@ -192,9 +197,10 @@ func (e *E621Service) FindSuitableSample(post *E621PostResponse) (string, error)
 
 	// If the post is a video, we find the best fit
 	if isVideo {
-		possible := make([]File, 0)
+		possible := []File{}
+
 		for _, alt := range post.Sample.Alts {
-			var file *File
+			var file *File = nil
 
 			for _, url := range alt.URLs {
 				// Skip if the URL is nil
@@ -241,6 +247,11 @@ func (e *E621Service) FindSuitableSample(post *E621PostResponse) (string, error)
 		}
 
 		return biggest.URL, nil
+	}
+
+	// If the post has no sample, return an error
+	if post.Sample.URL == "" {
+		return "", errors.New("post is too large and has no samples")
 	}
 
 	// If the post is an image, we just return the sample
