@@ -8,6 +8,11 @@ import (
 )
 
 func HandleOnMessageCreateEvent(ctx context.Context, s *discordgo.Session, e *discordgo.MessageCreate) error {
+	// Ignore bots
+	if e.Author != nil && e.Author.Bot {
+		return nil
+	}
+
 	// Ignore messages from whitelisted users
 	lm, ok := ctx.Value(LedgerManagerKey).(LedgerManager)
 	if !ok {
@@ -19,6 +24,11 @@ func HandleOnMessageCreateEvent(ctx context.Context, s *discordgo.Session, e *di
 }
 
 func HandleOnMessageEditEvent(ctx context.Context, s *discordgo.Session, e *discordgo.MessageUpdate) error {
+	// Ignore bots
+	if e.Author != nil && e.Author.Bot {
+		return nil
+	}
+
 	// Ignore messages from whitelisted users
 	lm, ok := ctx.Value(LedgerManagerKey).(LedgerManager)
 	if !ok {
@@ -30,6 +40,11 @@ func HandleOnMessageEditEvent(ctx context.Context, s *discordgo.Session, e *disc
 }
 
 func HandleOnMessageDeleteEvent(ctx context.Context, s *discordgo.Session, e *discordgo.MessageDelete) error {
+	// Ignore bots
+	if e.Author != nil && e.Author.Bot {
+		return nil
+	}
+
 	// Ignore messages from whitelisted users
 	lm, ok := ctx.Value(LedgerManagerKey).(LedgerManager)
 	if !ok {
