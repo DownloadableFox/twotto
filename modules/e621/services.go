@@ -23,7 +23,7 @@ const MAX_POST_SIZE = 25 * 1024 * 1024
 type IE621Service interface {
 	GetRandomPost() (*E621Post, error)
 	GetPostByID(id int) (*E621Post, error)
-	SearchPosts(query string, limit, page int) ([]*E621Post, error)
+	SearchPosts(tags string, limit, page int) ([]*E621Post, error)
 	GetPopularPosts() ([]*E621Post, error)
 }
 
@@ -98,13 +98,15 @@ func (e *E621Service) GetPostByID(id int) (*E621Post, error) {
 	return e.parsePost(&post.Post)
 }
 
-func (e *E621Service) SearchPosts(query string, limit, page int) ([]*E621Post, error) {
+func (e *E621Service) SearchPosts(tags string, limit, page int) ([]*E621Post, error) {
 	// URL encode the query
-	query = url.QueryEscape(query)
+	tags = url.QueryEscape(tags)
 
 	// Append the limit and page
-	url := "https://e621.net/posts.json?tags=%s?&imit=%d&page=%d"
-	url = fmt.Sprintf(url, query, limit, page)
+	url := "https://e621.net/posts.json?tags=%s&limit=%d&page=%d"
+	url = fmt.Sprintf(url, tags, limit, page)
+
+	log.Debug().Msgf("[E621Service] Search URL: %s", url)
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -141,11 +143,15 @@ func (e *E621Service) SearchPosts(query string, limit, page int) ([]*E621Post, e
 }
 
 func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
+	if post.ID == 0 {
+		return nil, errors.New("post was not found")
+	}
+
 	useSample := post.File.Size > MAX_POST_SIZE
 
 	// If the post is too large and we can use the sample, use it
 	if useSample && !post.Sample.Has {
-		return nil, fmt.Errorf("post is too large and has no sample")
+		return nil, errors.New("post is too large and has no samples")
 	}
 
 	isVideo := post.File.Ext == "webm" || post.File.Ext == "mp4"
@@ -208,7 +214,7 @@ func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
 			}
 		} else {
 			// Check if the sample is too large
-			req, err := http.NewRequest(http.MethodGet, url, nil)
+			req, err := http.NewRequest(http.MethodGet, post.Sample.URL, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -220,10 +226,23 @@ func (e *E621Service) parsePost(post *E621PostResponse) (*E621Post, error) {
 				return nil, err
 			}
 
-			if resp.ContentLength > MAX_POST_SIZE {
-				return nil, fmt.Errorf("sample is too large")
+			// Read all contents of resp.Body to ensure it's not too large
+			byteCount := 0
+			buf := make([]byte, 1024)
+			for {
+				n, err := resp.Body.Read(buf)
+				byteCount += n
+				if err != nil {
+					break
+				}
 			}
-			resp.Body.Close()
+			defer resp.Body.Close()
+
+			if byteCount > MAX_POST_SIZE {
+				return nil, errors.New("no suitable image found")
+			}
+
+			url = post.Sample.URL
 		}
 	}
 

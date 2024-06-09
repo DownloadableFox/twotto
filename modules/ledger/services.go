@@ -487,6 +487,10 @@ func (m *RepoLedgerManager) LogMessageEdit(ctx context.Context, message *discord
 		return nil
 	}
 
+	if message.Message == nil {
+		return nil
+	}
+
 	// Check if the guild has logging enabled
 	shouldLog, err := m.GetShouldLog(ctx, message.GuildID)
 	if err != nil {

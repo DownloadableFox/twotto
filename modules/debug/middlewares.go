@@ -175,6 +175,12 @@ func MidwareErrorWrap(tag *core.Identifier) core.MiddlewareFunc[discordgo.Intera
 					})
 					return err
 				}
+
+				// If already replied, send followup
+				s.FollowupMessageCreate(e.Interaction, false, &discordgo.WebhookParams{
+					Flags:  res.Flags & discordgo.MessageFlagsEphemeral,
+					Embeds: []*discordgo.MessageEmbed{errorEmbed},
+				})
 			}
 
 			return nil
