@@ -93,6 +93,8 @@ func HandleYiffCommand(ctx context.Context, s *discordgo.Session, e *discordgo.I
 		return handleSearch(ctx, s, e)
 	case "post":
 		return handlePost(ctx, s, e)
+	case "popular":
+		return handlePopular(ctx, s, e)
 	}
 
 	return nil
@@ -162,14 +164,14 @@ func publishThread(s *discordgo.Session, channelID, messageID, tags string, post
 		embed := GeneratePostEmbed(post)
 		req, err := http.NewRequest(http.MethodGet, post.URL, nil)
 		if err != nil {
-			log.Warn().Err(err).Msgf("[E621YiffSearchCommand] Failed to create request for post #%d (source: %s)", post.ID, post.URL)
+			log.Warn().Err(err).Msgf("[E621YiffCommand] Failed to create request for post #%d (source: %s)", post.ID, post.URL)
 			success = false
 			continue
 		}
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Warn().Err(err).Msgf("[E621YiffSearchCommand] Failed to download post #%d (source: %s)", post.ID, post.URL)
+			log.Warn().Err(err).Msgf("[E621YiffCommand] Failed to download post #%d (source: %s)", post.ID, post.URL)
 			success = false
 			continue
 		}
@@ -184,7 +186,7 @@ func publishThread(s *discordgo.Session, channelID, messageID, tags string, post
 			Embed: embed,
 			Files: []*discordgo.File{file},
 		}); err != nil {
-			log.Warn().Err(err).Msgf("[E621YiffSearchCommand] Failed to send post #%d (source: %s)", post.ID, post.URL)
+			log.Warn().Err(err).Msgf("[E621YiffCommand] Failed to send post #%d (source: %s)", post.ID, post.URL)
 			success = false
 			continue
 		}
@@ -298,6 +300,24 @@ func handleSearch(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 	}
 
 	// Update interaction
+	duration := time.Since(startTime)
+	hours := int(duration.Hours())
+	minutes := int(duration.Minutes()) % 60
+	seconds := int(duration.Seconds()) % 60
+
+	durationStr := ""
+	if hours > 0 {
+		durationStr += fmt.Sprintf("%dh ", hours)
+	}
+
+	if minutes > 0 {
+		durationStr += fmt.Sprintf("%dm ", minutes)
+	}
+
+	if seconds > 0 {
+		durationStr += fmt.Sprintf("%ds", seconds)
+	}
+
 	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{{
 			Title:       "Posts sent!",
@@ -315,7 +335,7 @@ func handleSearch(ctx context.Context, s *discordgo.Session, e *discordgo.Intera
 				},
 				{
 					Name:   "Elapsed Time",
-					Value:  fmt.Sprintf("%s sec", time.Since(startTime).Round(time.Second).String()),
+					Value:  durationStr,
 					Inline: true,
 				},
 			},
@@ -350,6 +370,49 @@ func handlePost(ctx context.Context, s *discordgo.Session, e *discordgo.Interact
 
 	// Send the post
 	embed := GeneratePostEmbed(post)
+	req, err := http.NewRequest(http.MethodGet, post.URL, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	file := &discordgo.File{
+		Name:   fmt.Sprintf("post-%d.%s", post.ID, post.Ext),
+		Reader: res.Body,
+	}
+
+	if _, err := s.InteractionResponseEdit(e.Interaction, &discordgo.WebhookEdit{
+		Embeds: &[]*discordgo.MessageEmbed{embed},
+		Files:  []*discordgo.File{file},
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func handlePopular(ctx context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+	// Get E621 service from context
+	svc, ok := ctx.Value(E621ServiceKey).(IE621Service)
+	if !ok || svc == nil {
+		return ErrE621ServiceNotFound
+	}
+
+	// Get the post
+	post, err := svc.GetRandomPost()
+	if err != nil {
+		return err
+	}
+
+	// Send the post
+	embed := GeneratePostEmbed(post)
+
+	// Create file request
 	req, err := http.NewRequest(http.MethodGet, post.URL, nil)
 	if err != nil {
 		return err

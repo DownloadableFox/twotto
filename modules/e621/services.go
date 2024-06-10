@@ -293,5 +293,38 @@ func (e *E621Service) ParsePost(post *E621PostResponse) (*E621Post, error) {
 }
 
 func (e *E621Service) GetPopularPosts() ([]*E621Post, error) {
-	return nil, errors.New("not implemented")
+	const url = "https://e621.net/popular.json"
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", e.userAgent)
+
+	resp, err := e.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var posts struct {
+		Posts []*E621PostResponse `json:"posts"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&posts); err != nil {
+		return nil, err
+	}
+
+	var result []*E621Post
+	for _, post := range posts.Posts {
+		parsed, err := e.ParsePost(post)
+		if err != nil {
+			continue
+		}
+
+		result = append(result, parsed)
+	}
+
+	return result, nil
 }
