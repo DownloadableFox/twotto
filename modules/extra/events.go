@@ -14,6 +14,7 @@ func HandleOnReadyEvent(ctx context.Context, s *discordgo.Session, e *discordgo.
 	// Register commands
 	err := core.ApplyCommands(
 		SayCommand,
+		CreateForumCommand,
 	).For(s, "")
 	if err != nil {
 		log.Warn().Err(err).Msg("[DebugModule] Failed to register commands")

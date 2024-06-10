@@ -2,6 +2,8 @@ package debug
 
 import "github.com/downloadablefox/twotto/core"
 
+// ModuleProvider is an interface for managing modules and features.
+
 type ModuleProvider interface {
 	// Modules
 	EnableModule(module string, guildId string) error

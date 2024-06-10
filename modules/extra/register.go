@@ -24,6 +24,15 @@ func RegisterModule(client *discordgo.Session) {
 	)
 	client.AddHandler(core.HandleEvent(sayCommand))
 
+	// Add forum create command
+	forumCreateCommandIdent := core.NewIdentifier("extra", "commands/create-forum")
+	forumCreateCommand := core.ApplyMiddlewares(
+		HandleCreateForumCommand,
+		debug.MidwareForCommand(CreateForumCommand),
+		debug.MidwareErrorWrap(forumCreateCommandIdent),
+	)
+	client.AddHandler(core.HandleEvent(forumCreateCommand))
+
 	// Add twitter link command
 	client.AddHandler(core.HandleEvent(HandleTwitterLinkEvent))
 }
