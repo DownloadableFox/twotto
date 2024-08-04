@@ -298,7 +298,7 @@ func HandleFeatureCommand(c context.Context, s *discordgo.Session, e *discordgo.
 		}
 	}
 
-	return fmt.Errorf("unknown subcommand %q", options[0].Name)
+	return nil
 }
 
 func HandleFeatureAutocomplete(c context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
