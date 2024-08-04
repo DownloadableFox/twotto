@@ -33,7 +33,7 @@ type PostgresFeatureService struct {
 	registeredFeatures map[*core.Identifier]Feature
 }
 
-func NewPostgresFeatureService(pool *pgxpool.Pool) *PostgresFeatureService {
+func NewPostgresFeatureService(pool *pgxpool.Pool) FeatureService {
 	return &PostgresFeatureService{
 		pool:               pool,
 		registeredFeatures: make(map[*core.Identifier]Feature),
