@@ -102,12 +102,12 @@ func HandleFeatureSetupEvent(c context.Context, s *discordgo.Session, e *discord
 			if err != nil {
 				if err == ErrFeatureNotRegistered {
 					if err := fs.SetFeature(context.Background(), feature.Identifier, guild.ID, feature.DefaultState); err != nil {
-						log.Warn().Err(err).Msgf("[FeatureServiceSetup] Failed to set default feature state for guild \"%s\" (%s)!", guild.Name, guild.ID)
+						log.Warn().Err(err).Msgf("[FeatureServiceSetup] Failed to set default \"%s\" feature state for guild \"%s\" (%s)!", feature.Identifier, guild.Name, guild.ID)
 					}
 
-					log.Info().Msgf("[FeatureServiceSetup] Set default feature state for guild \"%s\" (%s)!", guild.Name, guild.ID)
+					log.Info().Msgf("[FeatureServiceSetup] Set default \"%s\" feature state for guild \"%s\" (%s)!", feature.Identifier, guild.Name, guild.ID)
 				} else {
-					log.Warn().Err(err).Msgf("[FeatureServiceSetup] Failed to get feature state for guild \"%s\" (%s)!", guild.Name, guild.ID)
+					log.Warn().Err(err).Msgf("[FeatureServiceSetup] Failed to get \"%s\" feature state for guild \"%s\" (%s)!", feature.Identifier, guild.Name, guild.ID)
 				}
 			}
 		}
