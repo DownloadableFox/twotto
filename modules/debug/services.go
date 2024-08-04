@@ -60,7 +60,7 @@ func (s *PostgresFeatureService) ListFeatures() ([]Feature, error) {
 
 func (s *PostgresFeatureService) GetFeature(ctx context.Context, identifier *core.Identifier, guildId string) (bool, error) {
 	var enabled bool
-	err := s.pool.QueryRow(ctx, "SELECT enabled FROM debug_features WHERE guild_id = $1 AND name = $2", guildId, identifier.String()).Scan(&enabled)
+	err := s.pool.QueryRow(ctx, "SELECT enabled FROM debug_feature WHERE guild_id = $1 AND name = $2", guildId, identifier.String()).Scan(&enabled)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, ErrFeatureNotRegistered
@@ -74,7 +74,7 @@ func (s *PostgresFeatureService) GetFeature(ctx context.Context, identifier *cor
 
 func (s *PostgresFeatureService) SetFeature(ctx context.Context, identifier *core.Identifier, guildId string, enabled bool) error {
 	_, err := s.pool.Exec(ctx,
-		"INSERT INTO debug_features (guild_id, name, enabled) VALUES ($1, $2, $3) ON CONFLICT (guild_id, name) DO UPDATE SET enabled = $3",
+		"INSERT INTO debug_feature (guild_id, name, enabled) VALUES ($1, $2, $3) ON CONFLICT (guild_id, name) DO UPDATE SET enabled = $3",
 		guildId, identifier.String(), enabled,
 	)
 
