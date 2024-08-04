@@ -1,83 +1,82 @@
 package debug
 
-import "github.com/downloadablefox/twotto/core"
+import (
+	"context"
+	"errors"
 
-// ModuleProvider is an interface for managing modules and features.
+	"github.com/downloadablefox/twotto/core"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
 
-type ModuleProvider interface {
-	// Modules
-	EnableModule(module string, guildId string) error
-	DisableModule(module string, guildId string) error
-	IsModuleEnabled(module string, guildId string) bool
+// Feature is a feature of the debug module
+var (
+	FeatureServiceKey         = core.NewIdentifier("debug", "service/features")
+	ErrFeatureServiceNotFound = errors.New("ledger manager not found in context (missing injection)")
+	ErrFeatureNotRegistered   = errors.New("feature not registered for guild")
+)
 
-	// Features
-	EnableFeature(identifier *core.Identifier, guildId string) error
-	DisableFeature(identifier *core.Identifier, guildId string) error
-	IsFeatureEnabled(identifier *core.Identifier, guildId string) bool
+type Feature struct {
+	Identifier   *core.Identifier
+	DefaultState bool
 }
 
-type GuildData struct {
-	enabledModules  map[string]bool
-	enabledFeatures map[string]bool
+type FeatureService interface {
+	RegisterFeature(identifier *core.Identifier, defaultValue bool) error
+	ListFeatures() ([]Feature, error)
+	GetFeature(ctx context.Context, identifier *core.Identifier, guildId string) (bool, error)
+	SetFeature(ctx context.Context, identifier *core.Identifier, guildId string, enabled bool) error
 }
 
-type InMemoryModuleProvider struct {
-	guildData map[string]*GuildData
+type PostgresFeatureService struct {
+	pool               *pgxpool.Pool
+	registeredFeatures map[*core.Identifier]Feature
 }
 
-func NewInMemoryModuleProvider() ModuleProvider {
-	return &InMemoryModuleProvider{
-		guildData: make(map[string]*GuildData),
+func NewPostgresFeatureService(pool *pgxpool.Pool) *PostgresFeatureService {
+	return &PostgresFeatureService{
+		pool:               pool,
+		registeredFeatures: make(map[*core.Identifier]Feature),
 	}
 }
 
-func (p *InMemoryModuleProvider) GetGuildData(guildId string) *GuildData {
-	data, ok := p.guildData[guildId]
-	if !ok {
-		p.guildData[guildId] = &GuildData{
-			enabledModules:  make(map[string]bool),
-			enabledFeatures: make(map[string]bool),
+func (s *PostgresFeatureService) RegisterFeature(identifier *core.Identifier, defaultValue bool) error {
+	s.registeredFeatures[identifier] = Feature{
+		Identifier:   identifier,
+		DefaultState: defaultValue,
+	}
+
+	return nil
+}
+
+func (s *PostgresFeatureService) ListFeatures() ([]Feature, error) {
+	var features []Feature
+	for _, f := range s.registeredFeatures {
+		features = append(features, f)
+	}
+
+	return features, nil
+}
+
+func (s *PostgresFeatureService) GetFeature(ctx context.Context, identifier *core.Identifier, guildId string) (bool, error) {
+	var enabled bool
+	err := s.pool.QueryRow(ctx, "SELECT enabled FROM debug_features WHERE guild_id = $1 AND name = $2", guildId, identifier.String()).Scan(&enabled)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrFeatureNotRegistered
 		}
 
-		return p.guildData[guildId]
+		return false, err
 	}
 
-	return data
-}
-func (p *InMemoryModuleProvider) EnableModule(module string, guildId string) error {
-	data := p.GetGuildData(guildId)
-	data.enabledModules[module] = true
-
-	return nil
+	return enabled, nil
 }
 
-func (p *InMemoryModuleProvider) DisableModule(module string, guildId string) error {
-	data := p.GetGuildData(guildId)
-	data.enabledModules[module] = false
+func (s *PostgresFeatureService) SetFeature(ctx context.Context, identifier *core.Identifier, guildId string, enabled bool) error {
+	_, err := s.pool.Exec(ctx,
+		"INSERT INTO debug_features (guild_id, name, enabled) VALUES ($1, $2, $3) ON CONFLICT (guild_id, name) DO UPDATE SET enabled = $3",
+		guildId, identifier.String(), enabled,
+	)
 
-	return nil
-}
-
-func (p *InMemoryModuleProvider) IsModuleEnabled(module string, guildId string) bool {
-	data := p.GetGuildData(guildId)
-	return data.enabledModules[module]
-}
-
-func (p *InMemoryModuleProvider) EnableFeature(identifier *core.Identifier, guildId string) error {
-	data := p.GetGuildData(guildId)
-	data.enabledFeatures[identifier.String()] = true
-
-	return nil
-}
-
-func (p *InMemoryModuleProvider) DisableFeature(identifier *core.Identifier, guildId string) error {
-	data := p.GetGuildData(guildId)
-	data.enabledFeatures[identifier.String()] = false
-
-	return nil
-}
-
-func (p *InMemoryModuleProvider) IsFeatureEnabled(identifier *core.Identifier, guildId string) bool {
-	data := p.GetGuildData(guildId)
-	return data.enabledFeatures[identifier.String()]
+	return err
 }

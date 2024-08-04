@@ -75,3 +75,45 @@ func HandleOnReadyEvent(_ context.Context, s *discordgo.Session, e *discordgo.Re
 
 	return nil
 }
+
+func HandleFeatureSetupEvent(c context.Context, s *discordgo.Session, e *discordgo.Ready) error {
+	log.Info().Msg("[FeatureServiceSetup] Registering features...")
+
+	fs, ok := c.Value(FeatureServiceKey).(FeatureService)
+	if !ok {
+		return ErrFeatureServiceNotFound
+	}
+
+	features, err := fs.ListFeatures()
+	if err != nil {
+		log.Warn().Err(err).Msg("[FeatureServiceSetup] Failed to list features!")
+		return err
+	}
+
+	guilds, err := s.UserGuilds(0, "", "", false)
+	if err != nil {
+		log.Warn().Err(err).Msg("[FeatureServiceSetup] Failed to list guilds!")
+		return err
+	}
+
+	for _, guild := range guilds {
+		for _, feature := range features {
+			_, err := fs.GetFeature(context.Background(), feature.Identifier, guild.ID)
+			if err != nil {
+				if err == ErrFeatureNotRegistered {
+					if err := fs.SetFeature(context.Background(), feature.Identifier, guild.ID, feature.DefaultState); err != nil {
+						log.Warn().Err(err).Msgf("[FeatureServiceSetup] Failed to set default feature state for guild \"%s\" (%s)!", guild.Name, guild.ID)
+					}
+
+					log.Info().Msgf("[FeatureServiceSetup] Set default feature state for guild \"%s\" (%s)!", guild.Name, guild.ID)
+				} else {
+					log.Warn().Err(err).Msgf("[FeatureServiceSetup] Failed to get feature state for guild \"%s\" (%s)!", guild.Name, guild.ID)
+				}
+			}
+		}
+	}
+
+	log.Info().Msg("[FeatureServiceSetup] Features registered!")
+
+	return nil
+}

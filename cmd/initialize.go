@@ -45,6 +45,11 @@ func InitializeLedgerManager(session *discordgo.Session, pool *pgxpool.Pool) led
 	return nil
 }
 
+func InitializeFeatureService(pool *pgxpool.Pool) debug.FeatureService {
+	wire.Build(debug.NewPostgresFeatureService)
+	return nil
+}
+
 func bootstrap(client *discordgo.Session, config *Config) error {
 	// Set intents
 	client.Identify.Intents = discordgo.IntentGuildMessages | discordgo.IntentGuildMessageReactions | discordgo.IntentGuildMembers | discordgo.IntentGuildBans
@@ -55,8 +60,9 @@ func bootstrap(client *discordgo.Session, config *Config) error {
 	}
 
 	// Register modules
-	debug.RegisterModule(client)
-	extra.RegisterModule(client)
+	featureService := InitializeFeatureService(pool)
+	debug.RegisterModule(client, featureService)
+	extra.RegisterModule(client, featureService)
 
 	whitelistManager := InitializeWhitelistManager(pool)
 	whitelist.RegisterModule(client, whitelistManager)

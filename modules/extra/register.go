@@ -6,7 +6,7 @@ import (
 	"github.com/downloadablefox/twotto/modules/debug"
 )
 
-func RegisterModule(client *discordgo.Session) {
+func RegisterModule(client *discordgo.Session, featureService debug.FeatureService) {
 	// Add on ready event
 	onReadyIdent := core.NewIdentifier("extra", "events/setup")
 	onReady := core.ApplyMiddlewares(
@@ -34,5 +34,12 @@ func RegisterModule(client *discordgo.Session) {
 	client.AddHandler(core.HandleEvent(forumCreateCommand))
 
 	// Add twitter link command
-	client.AddHandler(core.HandleEvent(HandleTwitterLinkEvent))
+	twitterEmbedEventIdent := core.NewIdentifier("extra", "event/twitter-link")
+	featureService.RegisterFeature(twitterEmbedEventIdent, false)
+	twitterEmbedEvent := core.ApplyMiddlewares(
+		HandleTwitterLinkEvent,
+		debug.MidwareFeatureEnabled[discordgo.MessageCreate](twitterEmbedEventIdent, featureService),
+		debug.MidwarePerformance[discordgo.MessageCreate](twitterEmbedEventIdent),
+	)
+	client.AddHandler(core.HandleEvent(twitterEmbedEvent))
 }

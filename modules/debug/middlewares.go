@@ -224,30 +224,19 @@ func GetGuildFromEvent(event interface{}) string {
 	}
 }
 
-func MidwareModuleEnabled[T interface{}](module string, provider ModuleProvider) core.MiddlewareFunc[T] {
+func MidwareFeatureEnabled[T interface{}](identifier *core.Identifier, service FeatureService) core.MiddlewareFunc[T] {
 	return func(next core.EventFunc[T]) core.EventFunc[T] {
 		return func(c context.Context, s *discordgo.Session, e *T) error {
 			guildId := GetGuildFromEvent(e)
 			if guildId == "" {
 				return fmt.Errorf("failed to determine guild id for event %T", e)
 			}
-			if !provider.IsModuleEnabled(module, guildId) {
-				return nil
-			}
 
-			return next(c, s, e)
-		}
-	}
-}
+			if enabled, err := service.GetFeature(context.Background(), identifier, guildId); err != nil || !enabled {
+				if err != nil {
+					log.Warn().Err(err).Msg("[FeatureMidware] Failed to check if feature is enabled!")
+				}
 
-func MidwareFeatureEnabled[T interface{}](identifier *core.Identifier, provider ModuleProvider) core.MiddlewareFunc[T] {
-	return func(next core.EventFunc[T]) core.EventFunc[T] {
-		return func(c context.Context, s *discordgo.Session, e *T) error {
-			guildId := GetGuildFromEvent(e)
-			if guildId == "" {
-				return fmt.Errorf("failed to determine guild id for event %T", e)
-			}
-			if !provider.IsFeatureEnabled(identifier, guildId) {
 				return nil
 			}
 
