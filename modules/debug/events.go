@@ -54,6 +54,7 @@ func HandleOnReadyEvent(_ context.Context, s *discordgo.Session, e *discordgo.Re
 	// Register commands
 	err = core.ApplyCommands(
 		PingCommand,
+		FeatureCommand,
 		ErrorTestCommand,
 	).For(s, "")
 	if err != nil {
