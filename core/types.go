@@ -54,3 +54,16 @@ func IsValidNamespace(namespace string) bool {
 func IsValidId(id string) bool {
 	return IdRegex.MatchString(id)
 }
+
+func ParseIdentifier(identifier string) (*Identifier, error) {
+	parts := regexp.MustCompile(`:`).Split(identifier, 2)
+	if len(parts) != 2 {
+		return nil, ErrInvalidIdentifier
+	}
+
+	if !IsValidNamespace(parts[0]) || !IsValidId(parts[1]) {
+		return nil, ErrInvalidIdentifier
+	}
+
+	return NewIdentifier(parts[0], parts[1]), nil
+}

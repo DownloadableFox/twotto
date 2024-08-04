@@ -155,3 +155,179 @@ func HandlePingCommand(_ context.Context, s *discordgo.Session, e *discordgo.Int
 
 	return nil
 }
+
+var FeatureCommandPermissions int64 = discordgo.PermissionAdministrator
+
+var FeatureCommand = &discordgo.ApplicationCommand{
+	Name:                     "feature",
+	Description:              "Manage features for the bot.",
+	DefaultMemberPermissions: &FeatureCommandPermissions,
+	Options: []*discordgo.ApplicationCommandOption{
+		{
+			Name:        "get",
+			Description: "Get the state of a feature.",
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Name:         "feature",
+					Description:  "The feature to get the state of.",
+					Type:         discordgo.ApplicationCommandOptionString,
+					Required:     true,
+					Autocomplete: true,
+				},
+			},
+		},
+		{
+			Name:        "set",
+			Description: "Set the state of a feature.",
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Name:         "feature",
+					Description:  "The feature to set the state of.",
+					Type:         discordgo.ApplicationCommandOptionString,
+					Required:     true,
+					Autocomplete: true,
+				},
+				{
+					Name:        "state",
+					Description: "The state to set the feature to.",
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Required:    true,
+				},
+			},
+		},
+	},
+}
+
+var (
+	_ core.EventFunc[discordgo.InteractionCreate] = HandleFeatureCommand
+	_ core.EventFunc[discordgo.InteractionCreate] = HandleFeatureAutocomplete
+)
+
+func HandleFeatureCommand(c context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+	data := e.ApplicationCommandData()
+
+	fs, ok := c.Value(FeatureServiceKey).(FeatureService)
+	if !ok {
+		return ErrFeatureServiceNotFound
+	}
+
+	options := data.Options
+	switch options[0].Name {
+	case "get":
+		featureName := options[0].Options[0].StringValue()
+		identifier, err := core.ParseIdentifier(featureName)
+		if err != nil {
+			return err
+		}
+
+		enabled, err := fs.GetFeature(context.Background(), identifier, e.GuildID)
+		if err != nil {
+			if errors.Is(err, ErrFeatureNotRegistered) {
+				response := &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Flags: discordgo.MessageFlagsEphemeral,
+						Embeds: []*discordgo.MessageEmbed{
+							{
+								Title:       "Feature not registered!",
+								Color:       core.ColorError,
+								Description: fmt.Sprintf("The feature `%s` is not registered for this guild.", featureName),
+							},
+						},
+					},
+				}
+
+				if err := s.InteractionRespond(e.Interaction, response); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			return err
+		}
+
+		response := &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags: discordgo.MessageFlagsEphemeral,
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Title:       "Feature state",
+						Color:       core.ColorInfo,
+						Description: fmt.Sprintf("The feature `%s` is currently %s.", featureName, map[bool]string{true: "enabled", false: "disabled"}[enabled]),
+					},
+				},
+			},
+		}
+
+		if err := s.InteractionRespond(e.Interaction, response); err != nil {
+			return err
+		}
+	case "set":
+		featureName := options[0].Options[0].StringValue()
+		identifier, err := core.ParseIdentifier(featureName)
+		if err != nil {
+			return err
+		}
+
+		state := options[0].Options[1].BoolValue()
+
+		if err := fs.SetFeature(context.Background(), identifier, e.GuildID, state); err != nil {
+			return err
+		}
+
+		response := &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Flags: discordgo.MessageFlagsEphemeral,
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Title:       "Feature state updated!",
+						Color:       core.ColorSuccess,
+						Description: fmt.Sprintf("The feature `%s` is now %s.", featureName, map[bool]string{true: "enabled", false: "disabled"}[state]),
+					},
+				},
+			},
+		}
+
+		if err := s.InteractionRespond(e.Interaction, response); err != nil {
+			return err
+		}
+	}
+
+	return fmt.Errorf("unknown subcommand %q", options[0].Name)
+}
+
+func HandleFeatureAutocomplete(c context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+	fs, ok := c.Value(FeatureServiceKey).(FeatureService)
+	if !ok {
+		return ErrFeatureServiceNotFound
+	}
+
+	features, err := fs.ListFeatures()
+	if err != nil {
+		return err
+	}
+
+	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(features))
+	for _, feature := range features {
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  feature.Identifier.String(),
+			Value: feature.Identifier.String(),
+		})
+	}
+
+	if err := s.InteractionRespond(e.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
+		Data: &discordgo.InteractionResponseData{
+			Choices: choices,
+		},
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}

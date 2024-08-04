@@ -22,6 +22,22 @@ func RegisterModule(client *discordgo.Session, featureService FeatureService) {
 	)
 	client.AddHandler(core.HandleEvent(featureSetupEvent))
 
+	featureCommandIdent := core.NewIdentifier("debug", "commands/feature")
+	featureCommand := core.ApplyMiddlewares(
+		HandleFeatureCommand,
+		MidwareContextInject[discordgo.InteractionCreate](FeatureServiceKey, featureService),
+		MidwareForCommand(FeatureCommand),
+		MidwareErrorWrap(featureCommandIdent),
+	)
+	client.AddHandler(core.HandleEvent(featureCommand))
+
+	featureCommandAutoComplete := core.ApplyMiddlewares(
+		HandleFeatureAutocomplete,
+		MidwareContextInject[discordgo.InteractionCreate](FeatureServiceKey, featureService),
+		MidwareForAutocomplete(FeatureCommand),
+	)
+	client.AddHandler(core.HandleEvent(featureCommandAutoComplete))
+
 	pingCommandIdent := core.NewIdentifier("debug", "commands/ping")
 	pingCommand := core.ApplyMiddlewares(
 		HandlePingCommand,

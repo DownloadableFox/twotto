@@ -192,6 +192,29 @@ func MidwareForCommand(command *discordgo.ApplicationCommand) core.MiddlewareFun
 	// Register command
 	return func(next core.EventFunc[discordgo.InteractionCreate]) core.EventFunc[discordgo.InteractionCreate] {
 		return func(c context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+			if e.Type != discordgo.InteractionApplicationCommand {
+				return nil
+			}
+
+			data := e.ApplicationCommandData()
+
+			// Ignore if not the correct command
+			if data.Name != command.Name {
+				return nil
+			}
+
+			return next(c, s, e)
+		}
+	}
+}
+
+func MidwareForAutocomplete(command *discordgo.ApplicationCommand) core.MiddlewareFunc[discordgo.InteractionCreate] {
+	return func(next core.EventFunc[discordgo.InteractionCreate]) core.EventFunc[discordgo.InteractionCreate] {
+		return func(c context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+			if e.Type != discordgo.InteractionApplicationCommandAutocomplete {
+				return nil
+			}
+
 			data := e.ApplicationCommandData()
 
 			// Ignore if not the correct command
