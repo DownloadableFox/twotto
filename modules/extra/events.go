@@ -25,7 +25,7 @@ func HandleOnReadyEvent(ctx context.Context, s *discordgo.Session, e *discordgo.
 }
 
 var (
-	TwitterLinkRegex = regexp.MustCompile(`(https?://)?(www\.)?(twitter|x)\.com/([a-zA-Z0-9_]+/status/[0-9]+)`)
+	TwitterLinkRegex = regexp.MustCompile(`^(https?://)?(www\.)?(twitter|x)\.com/([a-zA-Z0-9_]+/status/[0-9]+)`)
 )
 
 // Event that catches a twitter/x link and fixes it with the correct content.
@@ -54,6 +54,15 @@ func HandleTwitterLinkEvent(_ context.Context, s *discordgo.Session, e *discordg
 	linksStr := ""
 	for _, link := range links {
 		linksStr += fmt.Sprintf("https://vxtwitter.com/%s\n", link)
+	}
+
+	// Remove attachments from reference
+	if _, err := s.ChannelMessageEditComplex(&discordgo.MessageEdit{
+		Channel: e.ChannelID,
+		ID:      e.ID,
+		Flags:   e.Flags | discordgo.MessageFlagsSuppressEmbeds,
+	}); err != nil {
+		return err
 	}
 
 	_, err := s.ChannelMessageSendReply(e.ChannelID, fmt.Sprintf("I have fixed the Twitter embeds for you ;3\n%s", linksStr), e.Reference())
