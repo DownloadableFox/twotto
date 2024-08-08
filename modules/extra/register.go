@@ -39,7 +39,6 @@ func RegisterModule(client *discordgo.Session, featureService debug.FeatureServi
 	twitterEmbedEvent := core.ApplyMiddlewares(
 		HandleTwitterLinkEvent,
 		debug.MidwareFeatureEnabled[discordgo.MessageCreate](twitterEmbedEventIdent, featureService),
-		debug.MidwarePerformance[discordgo.MessageCreate](twitterEmbedEventIdent),
 	)
 	client.AddHandler(core.HandleEvent(twitterEmbedEvent))
 }
