@@ -10,7 +10,6 @@ import (
 func RegisterModule(client *discordgo.Session, web *fiber.App) error {
 	// Register the remote module
 	remote := web.Group("/remote/v1")
-	remote.Use(WebMidwareLogger)
 	remote.Get("/heartbeat", HandleHeartbeat)
 	remote.Get("/activity", HandleGetActivity(client))
 
