@@ -9,35 +9,18 @@ import (
 )
 
 func HandleOnReadyEvent(ctx context.Context, s *discordgo.Session, e *discordgo.Ready) error {
-	// Ignore messages from whitelisted users
-	web, ok := ctx.Value(WebServerKey).(*fiber.App)
-	if !ok || web == nil {
-		return ErrWebServerNotFound
+	fiber, ok := ctx.Value(FiberServerKey).(*fiber.App)
+	if !ok {
+		return ErrFiberNotFound
 	}
 
-	// Start web server
+	// start fiber server
 	go func() {
-		log.Info().Msg("Starting web server on :3000")
-
-		if err := web.Listen(":3000"); err != nil {
+		log.Info().Msg("[RemoteService] Web server started on :3000")
+		if err := fiber.Listen(":3000"); err != nil {
 			panic(err)
 		}
 	}()
-
-	return nil
-}
-
-func HandleOnShutdownEvent(ctx context.Context, s *discordgo.Session, e *discordgo.Disconnect) error {
-	// Ignore messages from whitelisted users
-	web, ok := ctx.Value(WebServerKey).(*fiber.App)
-	if !ok || web == nil {
-		return ErrWebServerNotFound
-	}
-
-	// Shutdown web server
-	if err := web.Shutdown(); err != nil {
-		return err
-	}
 
 	return nil
 }

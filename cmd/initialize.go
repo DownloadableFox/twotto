@@ -11,7 +11,9 @@ import (
 	"github.com/downloadablefox/twotto/modules/e621"
 	"github.com/downloadablefox/twotto/modules/extra"
 	"github.com/downloadablefox/twotto/modules/ledger"
+	"github.com/downloadablefox/twotto/modules/remote"
 	"github.com/downloadablefox/twotto/modules/whitelist"
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -72,6 +74,11 @@ func bootstrap(client *discordgo.Session, config *Config) error {
 
 	e621Client := e621.NewE621Service("twotto/1.0 (DownloadableFox)")
 	e621.RegisterModule(client, e621Client)
+
+	web := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
+	remote.RegisterModule(client, web)
 
 	return nil
 }
