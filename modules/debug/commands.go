@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"slices"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/downloadablefox/twotto/core"
+	"github.com/rs/zerolog/log"
 )
 
 var ErrorTestCommandPermissions int64 = discordgo.PermissionAdministrator
@@ -328,6 +331,56 @@ func HandleFeatureAutocomplete(c context.Context, s *discordgo.Session, e *disco
 	}); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+var RestartCommand = &discordgo.ApplicationCommand{
+	Name:        "restart",
+	Description: "Restarts the bot.",
+	Version:     "1.0.0",
+}
+
+func HandleRestartCommand(c context.Context, s *discordgo.Session, e *discordgo.InteractionCreate) error {
+	var owners = []string{"556132236697665547", "836684190987583576", "610825796285890581"}
+
+	var userId string
+	if e.Member != nil {
+		userId = e.Member.User.ID
+	} else {
+		userId = e.User.ID
+	}
+
+	if !slices.Contains(owners, userId) {
+		return errors.New("you are not authorized to use this command")
+	}
+
+	response := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+			Embeds: []*discordgo.MessageEmbed{
+				{
+					Title:       "Restarting...",
+					Color:       core.ColorInfo,
+					Description: "The bot is now restarting. Please wait a moment.",
+				},
+			},
+		},
+	}
+
+	if err := s.InteractionRespond(e.Interaction, response); err != nil {
+		return err
+	}
+
+	// Log the restart
+	log.Info().Msg("[Debug] Restart command received- Restarting bot...")
+
+	// Remove all commands
+	core.UnregisterAllCommands(s)
+
+	// Close the session
+	os.Exit(1)
 
 	return nil
 }

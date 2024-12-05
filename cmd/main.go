@@ -7,6 +7,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/cristalhq/aconfig"
+	"github.com/downloadablefox/twotto/core"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -56,14 +57,5 @@ func main() {
 	log.Warn().Msg("[Main] Stop signal sent! Stopping bot now...")
 
 	// Remove all commands
-	commands, err := client.ApplicationCommands(client.State.User.ID, "")
-	if err != nil {
-		log.Error().Err(err).Msg("[Main] Failed to list all commands!")
-	}
-
-	for _, command := range commands {
-		if err := client.ApplicationCommandDelete(client.State.User.ID, "", command.ID); err != nil {
-			log.Error().Err(err).Msgf("[Main] Failed to remove command %s!", command.Name)
-		}
-	}
+	core.UnregisterAllCommands(client)
 }
