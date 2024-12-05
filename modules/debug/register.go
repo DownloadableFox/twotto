@@ -53,4 +53,13 @@ func RegisterModule(client *discordgo.Session, featureService FeatureService) {
 		MidwareErrorWrap(errorTestCommandIdent),
 	)
 	client.AddHandler(core.HandleEvent(errorTestCommand))
+
+	restartCommandIdent := core.NewIdentifier("debug", "commands/restart")
+	restartCommand := core.ApplyMiddlewares(
+		HandleRestartCommand,
+		MidwareForCommand(RestartCommand),
+		MidwareErrorWrap(restartCommandIdent),
+	)
+
+	client.AddHandler(core.HandleEvent(restartCommand))
 }

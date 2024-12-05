@@ -56,6 +56,7 @@ func HandleOnReadyEvent(_ context.Context, s *discordgo.Session, e *discordgo.Re
 		PingCommand,
 		FeatureCommand,
 		ErrorTestCommand,
+		RestartCommand,
 	).For(s, "")
 	if err != nil {
 		log.Warn().Err(err).Msg("[DebugModule] Failed to register commands")
